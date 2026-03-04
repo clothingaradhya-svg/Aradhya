@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite",
-    "dev:api": "npm --prefix Backend run dev",
+    "dev:api": "npm --prefix backend run dev",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "postinstall": "prisma generate --schema Backend/prisma/schema.prisma"
+    "postinstall": "prisma generate --schema backend/prisma/schema.prisma"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

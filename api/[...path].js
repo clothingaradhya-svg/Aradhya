@@ -6,7 +6,7 @@ let cachedApp = null;
 const loadApp = () => {
   if (cachedApp) return cachedApp;
 
-  const mod = require('../Backend/index.js');
+  const mod = require('../backend/index.js');
   const app = mod?.default ?? mod;
   if (typeof app !== 'function') {
     throw new Error('Backend app export is invalid.');
