@@ -193,7 +193,7 @@ const SearchPage = () => {
             ) : error ? (
               <p className="text-sm uppercase tracking-[0.3em] text-red-600">{error}</p>
             ) : productResults.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {productResults.map((item) => (
                   <ProductCard key={item.href} item={item} />
                 ))}
