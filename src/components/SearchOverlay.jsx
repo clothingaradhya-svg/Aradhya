@@ -238,48 +238,50 @@ const SearchOverlay = ({ open, onClose }) => {
                 </p>
               ) : null}
             </div>
-            <div className="mt-4 max-h-[58vh] space-y-3 overflow-y-auto pr-1">
-              {loading ? (
-                <p className="text-sm uppercase tracking-[0.25em] text-neutral-500">
-                  Searching for "{query}"...
-                </p>
-              ) : productResults.length === 0 ? (
-                <p className="text-sm uppercase tracking-[0.25em] text-neutral-500">
-                  {query ? `No results for "${query}".` : 'No featured products available right now.'}
-                </p>
-              ) : (
-                productResults.map((item) => (
-                  <button
-                    key={item.href}
-                    type="button"
-                    onClick={() => handleProductClick(item.href)}
-                    className="flex w-full items-center gap-4 rounded-xl border border-transparent p-2 text-left transition hover:border-neutral-200 hover:bg-white"
-                  >
-                    <div className="h-14 w-14 overflow-hidden rounded-lg bg-neutral-100">
-                      {item.img ? (
-                        <img
-                          src={item.img}
-                          alt={item.title || 'Product'}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-[0.3em] text-neutral-400">
-                          No Image
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs uppercase tracking-[0.3em] text-neutral-900">
-                        {item.title}
-                      </span>
-                      <span className="text-[10px] uppercase tracking-[0.25em] text-neutral-500">
-                        {item.price}
-                      </span>
-                    </div>
-                  </button>
-                ))
-              )}
+            <div className="mt-4 max-h-[58vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {loading ? (
+                  <p className="col-span-2 text-sm uppercase tracking-[0.25em] text-neutral-500">
+                    Searching for "{query}"...
+                  </p>
+                ) : productResults.length === 0 ? (
+                  <p className="col-span-2 text-sm uppercase tracking-[0.25em] text-neutral-500">
+                    {query ? `No results for "${query}".` : 'No featured products available right now.'}
+                  </p>
+                ) : (
+                  productResults.map((item) => (
+                    <button
+                      key={item.href}
+                      type="button"
+                      onClick={() => handleProductClick(item.href)}
+                      className="flex flex-col w-full gap-2 rounded-xl border border-transparent p-2 text-left transition hover:border-neutral-200 hover:bg-white"
+                    >
+                      <div className="aspect-square w-full overflow-hidden rounded-lg bg-neutral-100">
+                        {item.img ? (
+                          <img
+                            src={item.img}
+                            alt={item.title || 'Product'}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-[0.3em] text-neutral-400">
+                            No Image
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-[0.28em] text-neutral-900 line-clamp-2">
+                          {item.title}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+                          {item.price}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
