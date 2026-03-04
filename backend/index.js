@@ -69,6 +69,9 @@ const isVercelPreviewOrigin = (origin = '') => {
   return vercelOriginRegex.test(origin);
 };
 
+const isVercelHostOrigin = (origin = '') =>
+  /^https?:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin || '');
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
@@ -76,7 +79,8 @@ const corsOptions = {
     if (
       allowedOriginSet.has(normalized) ||
       isLocalDevOrigin(normalized) ||
-      isVercelPreviewOrigin(normalized)
+      isVercelPreviewOrigin(normalized) ||
+      isVercelHostOrigin(normalized)
     ) {
       return callback(null, true);
     }
