@@ -626,6 +626,26 @@ export const fetchAllProducts = async (limit = 100, page = 1) => {
   return items.map(mapProduct).filter(Boolean);
 };
 
+export const fetchHomepageProducts = async (section, limit = 4) => {
+  if (!section) return [];
+  const payload = await request(
+    `/products${buildQuery({
+      homepageSection: section,
+      limit,
+      include: 'compact',
+      skipCount: 'true',
+    })}`,
+  );
+  const items = extractList(payload, `${section} homepage products`);
+  return {
+    items: items.map(mapProduct).filter(Boolean),
+    title:
+      payload?.meta?.sectionTitle ??
+      payload?.data?.meta?.sectionTitle ??
+      '',
+  };
+};
+
 export const fetchProductsPage = async ({
   limit = 40,
   page = 1,

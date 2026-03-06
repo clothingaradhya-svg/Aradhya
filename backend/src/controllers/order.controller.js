@@ -14,8 +14,9 @@ const {
 
 const FREE_SHIPPING_THRESHOLD = 5000;
 const STANDARD_SHIPPING_FEE = 100;
+const COD_ADVANCE_AMOUNT = 50;
 const PAYMENT_FEES = {
-  COD: 10,
+  COD: 0,
 };
 
 const shippingSchema = z.object({
@@ -206,6 +207,28 @@ const calculateShippingFee = (subtotal) =>
 const calculatePaymentFee = (paymentMethod) =>
   toMoney(PAYMENT_FEES[normalizePaymentMethod(paymentMethod)] || 0, 0);
 
+const getPaymentBreakdown = (paymentMethod, total) => {
+  const normalizedMethod = normalizePaymentMethod(paymentMethod);
+  const normalizedTotal = roundMoney(Math.max(toMoney(total, 0), 0));
+
+  if (normalizedMethod === "COD") {
+    const payableNow = roundMoney(Math.min(COD_ADVANCE_AMOUNT, normalizedTotal));
+    return {
+      advanceRequired: true,
+      advanceAmount: payableNow,
+      payableNow,
+      dueOnDelivery: roundMoney(Math.max(normalizedTotal - payableNow, 0)),
+    };
+  }
+
+  return {
+    advanceRequired: false,
+    advanceAmount: 0,
+    payableNow: normalizedTotal,
+    dueOnDelivery: 0,
+  };
+};
+
 const buildDiscountSnapshot = (discount, amount) => ({
   id: discount.id,
   code: discount.code,
@@ -294,6 +317,7 @@ const calculateCanonicalTotals = async (prisma, payload) => {
     discountAmount,
     discountCode: discount?.code || null,
     total,
+    ...getPaymentBreakdown(payload.paymentMethod, total),
     currency:
       String(payload?.totals?.currency || payload?.items?.[0]?.currency || "INR")
         .trim()
@@ -328,6 +352,13 @@ const verifyRazorpaySignature = ({ razorpayOrderId, razorpayPaymentId, razorpayS
 exports.createOrder = async (req, res, next) => {
   try {
     const payload = createOrderSchema.parse(req.body);
+    if (normalizePaymentMethod(payload.paymentMethod) === "COD") {
+      return sendError(
+        res,
+        400,
+        `Cash on Delivery requires a prepaid booking amount of Rs ${COD_ADVANCE_AMOUNT}.`,
+      );
+    }
     const prisma = await getPrisma();
     const canonicalTotals = await calculateCanonicalTotals(prisma, payload);
 
@@ -382,7 +413,7 @@ exports.createRazorpayOrder = async (req, res, next) => {
     if (payload.order) {
       const prisma = await getPrisma();
       canonicalTotals = await calculateCanonicalTotals(prisma, payload.order);
-      amount = Math.round(toMoney(canonicalTotals.total, 0) * 100);
+      amount = Math.round(toMoney(canonicalTotals.payableNow, 0) * 100);
       currency = canonicalTotals.currency || currency;
     }
 
@@ -399,6 +430,10 @@ exports.createRazorpayOrder = async (req, res, next) => {
     }
     if (canonicalTotals?.total > 0) {
       notes.computedTotal = String(canonicalTotals.total);
+    }
+    if (canonicalTotals?.advanceRequired) {
+      notes.advanceAmount = String(canonicalTotals.advanceAmount);
+      notes.dueOnDelivery = String(canonicalTotals.dueOnDelivery);
     }
 
     const response = await fetch("https://api.razorpay.com/v1/orders", {
@@ -467,17 +502,25 @@ exports.confirmRazorpayCheckout = async (req, res, next) => {
 
     const prisma = await getPrisma();
     const canonicalTotals = await calculateCanonicalTotals(prisma, order);
+    const normalizedMethod = normalizePaymentMethod(order.paymentMethod);
+    const paidAmount =
+      normalizedMethod === "COD" ? canonicalTotals.payableNow : canonicalTotals.total;
     const created = await prisma.order.create({
       data: {
         number: createOrderNumber(),
-        status: OrderStatus.PAID,
+        status: normalizedMethod === "COD" ? OrderStatus.PENDING : OrderStatus.PAID,
         paymentMethod: order.paymentMethod || "RAZORPAY",
-        totals: canonicalTotals,
+        totals: {
+          ...canonicalTotals,
+          paidAmount,
+          paymentConfirmedAt: new Date().toISOString(),
+        },
         shipping: {
           ...(order.shipping || {}),
           paymentId: payment.razorpayPaymentId,
           paymentOrderId: payment.razorpayOrderId,
           paymentGateway: "RAZORPAY",
+          paymentCaptureType: normalizedMethod === "COD" ? "ADVANCE" : "FULL",
         },
         items: order.items,
         userId: req.user?.id,

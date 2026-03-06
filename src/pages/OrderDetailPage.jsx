@@ -155,6 +155,10 @@ const OrderDetailPage = () => {
   const discountAmount = Number(order.totals?.discountAmount ?? 0);
   const discountCode = String(order.totals?.discountCode || '').trim();
   const total = Number(order.totals?.total ?? 0);
+  const payableNow = Number(order.totals?.payableNow ?? total);
+  const dueOnDelivery = Number(order.totals?.dueOnDelivery ?? 0);
+  const paidAmount = Number(order.totals?.paidAmount ?? 0);
+  const advanceRequired = Boolean(order.totals?.advanceRequired);
   const shipping = order.shipping || {};
 
   const statusToken = String(order.status || '').toUpperCase();
@@ -182,7 +186,7 @@ const OrderDetailPage = () => {
             current: order.status === 'PENDING',
           },
           {
-            status: 'Payment Confirmed',
+            status: advanceRequired ? 'Advance Paid' : 'Payment Confirmed',
             date: order.status !== 'PENDING' ? formatDateTime(order.updatedAt) : '-',
             completed: order.status !== 'PENDING',
             current: order.status === 'PAID',
@@ -230,6 +234,12 @@ const OrderDetailPage = () => {
                 </p>
                 <h2 className="text-2xl font-bold text-gray-900 mt-1">{meta.label}</h2>
                 <p className="text-sm text-gray-600 mt-1">{meta.description}</p>
+                {advanceRequired && dueOnDelivery > 0 ? (
+                  <p className="mt-2 text-sm font-medium text-amber-700">
+                    Advance received: {formatMoney(paidAmount || payableNow, currency)}. Remaining{' '}
+                    {formatMoney(dueOnDelivery, currency)} will be collected on delivery.
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="text-right">
@@ -411,6 +421,18 @@ const OrderDetailPage = () => {
                   <div className="flex justify-between text-gray-700">
                     <span>Payment Method</span>
                     <span className="font-semibold">{order.paymentMethod}</span>
+                  </div>
+                ) : null}
+                {paidAmount > 0 ? (
+                  <div className="flex justify-between text-gray-700">
+                    <span>Paid Now</span>
+                    <span>{formatMoney(paidAmount, currency)}</span>
+                  </div>
+                ) : null}
+                {dueOnDelivery > 0 ? (
+                  <div className="flex justify-between text-amber-700">
+                    <span>Pay On Delivery</span>
+                    <span className="font-semibold">{formatMoney(dueOnDelivery, currency)}</span>
                   </div>
                 ) : null}
                 <div className="border-t border-gray-200 pt-3">

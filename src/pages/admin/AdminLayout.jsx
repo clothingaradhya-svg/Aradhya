@@ -5,6 +5,7 @@ import { AdminToastProvider } from '../../components/admin/AdminToaster';
 import {
   LayoutDashboard,
   Package,
+  Sparkles,
   Layers,
   ShoppingBag,
   BadgePercent,
@@ -71,6 +72,10 @@ const AdminLayout = () => {
               <NavLink to="/admin/products" className={navItemClass}>
                 <Package className="w-5 h-5" />
                 <span>Products</span>
+              </NavLink>
+              <NavLink to="/admin/homepage-sections" className={navItemClass}>
+                <Sparkles className="w-5 h-5" />
+                <span>Homepage Sections</span>
               </NavLink>
               <NavLink to="/admin/collections" className={navItemClass}>
                 <Layers className="w-5 h-5" />

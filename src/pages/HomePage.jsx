@@ -6,7 +6,7 @@ import ProductGrid from '../components/ProductGrid';
 import VideoBanner from '../components/VideoBanner';
 import TypewriterSearch from '../components/TypewriterSearch';
 import { useCatalog } from '../contexts/catalog-context';
-import { toProductCard } from '../lib/api';
+import { fetchHomepageProducts, toProductCard } from '../lib/api';
 import heroVideo from '../assets/Coin_in_Nature_Climate_Video.mp4';
 
 const PRIMARY_HANDLE = import.meta.env.VITE_HOME_PRIMARY_COLLECTION ?? null;
@@ -16,6 +16,8 @@ export default function HomePage() {
   const { products: catalogProducts, ensureCollectionProducts } = useCatalog();
   const [latestProducts, setLatestProducts] = useState([]);
   const [moreProducts, setMoreProducts] = useState([]);
+  const [latestTitle, setLatestTitle] = useState('Special Products');
+  const [moreTitle, setMoreTitle] = useState('Most Selling Products');
   const [latestLoading, setLatestLoading] = useState(true);
   const [moreLoading, setMoreLoading] = useState(true);
   const [selectedSkintone, setSelectedSkintone] = useState(null);
@@ -55,22 +57,53 @@ export default function HomePage() {
       console.log('%c[HomePage] ⏳ Loading "Latest Drop" section...', 'color:#ec4899;font-weight:bold');
       setLatestLoading(true);
       if (!PRIMARY_HANDLE) {
-        setLatestProducts(fallbackLatest);
-        setLatestLoading(false);
-        return;
+        try {
+          const response = await fetchHomepageProducts('featured', 4);
+          if (cancelled) return;
+          setLatestTitle(response.title || 'Special Products');
+          setLatestProducts(
+            response.items.length
+              ? response.items.map((item) => toProductCard(item)).filter(Boolean)
+              : fallbackLatest,
+          );
+          return;
+        } catch (error) {
+          console.warn('Failed to load featured homepage products', error);
+          setLatestProducts(fallbackLatest);
+          setLatestLoading(false);
+          return;
+        }
       }
       try {
-        const products = await ensureCollectionProducts(PRIMARY_HANDLE, { limit: 4 });
+        const response = await fetchHomepageProducts('featured', 4);
         if (cancelled) return;
-        if (products?.length) {
-          setLatestProducts(products.map((item) => toProductCard(item)).filter(Boolean));
+        setLatestTitle(response.title || 'Special Products');
+        if (response.items?.length) {
+          setLatestProducts(response.items.map((item) => toProductCard(item)).filter(Boolean));
         } else {
-          setLatestProducts(fallbackLatest);
+          const collectionProducts = await ensureCollectionProducts(PRIMARY_HANDLE, { limit: 4 });
+          if (cancelled) return;
+          if (collectionProducts?.length) {
+            setLatestProducts(collectionProducts.map((item) => toProductCard(item)).filter(Boolean));
+          } else {
+            setLatestProducts(fallbackLatest);
+          }
         }
       } catch (error) {
-        console.warn(`Failed to load collection "${PRIMARY_HANDLE}"`, error);
+        console.warn('Failed to load featured homepage products', error);
         if (!cancelled) {
-          setLatestProducts(fallbackLatest);
+          try {
+            const collectionProducts = await ensureCollectionProducts(PRIMARY_HANDLE, { limit: 4 });
+            if (cancelled) return;
+            if (collectionProducts?.length) {
+              setLatestProducts(collectionProducts.map((item) => toProductCard(item)).filter(Boolean));
+            } else {
+              setLatestProducts(fallbackLatest);
+            }
+          } catch (collectionError) {
+            console.warn(`Failed to load collection "${PRIMARY_HANDLE}"`, collectionError);
+            setLatestProducts(fallbackLatest);
+          }
         }
       } finally {
         if (!cancelled) {
@@ -96,22 +129,53 @@ export default function HomePage() {
       console.log('%c[HomePage] ⏳ Loading "More From ARADHYA" section...', 'color:#ec4899;font-weight:bold');
       setMoreLoading(true);
       if (!SECONDARY_HANDLE) {
-        setMoreProducts(fallbackMore);
-        setMoreLoading(false);
-        return;
+        try {
+          const response = await fetchHomepageProducts('bestSeller', 4);
+          if (cancelled) return;
+          setMoreTitle(response.title || 'Most Selling Products');
+          setMoreProducts(
+            response.items.length
+              ? response.items.map((item) => toProductCard(item)).filter(Boolean)
+              : fallbackMore,
+          );
+          return;
+        } catch (error) {
+          console.warn('Failed to load best seller homepage products', error);
+          setMoreProducts(fallbackMore);
+          setMoreLoading(false);
+          return;
+        }
       }
       try {
-        const products = await ensureCollectionProducts(SECONDARY_HANDLE, { limit: 4 });
+        const response = await fetchHomepageProducts('bestSeller', 4);
         if (cancelled) return;
-        if (products?.length) {
-          setMoreProducts(products.map((item) => toProductCard(item)).filter(Boolean));
+        setMoreTitle(response.title || 'Most Selling Products');
+        if (response.items?.length) {
+          setMoreProducts(response.items.map((item) => toProductCard(item)).filter(Boolean));
         } else {
-          setMoreProducts(fallbackMore);
+          const collectionProducts = await ensureCollectionProducts(SECONDARY_HANDLE, { limit: 4 });
+          if (cancelled) return;
+          if (collectionProducts?.length) {
+            setMoreProducts(collectionProducts.map((item) => toProductCard(item)).filter(Boolean));
+          } else {
+            setMoreProducts(fallbackMore);
+          }
         }
       } catch (error) {
-        console.warn(`Failed to load collection "${SECONDARY_HANDLE}"`, error);
+        console.warn('Failed to load best seller homepage products', error);
         if (!cancelled) {
-          setMoreProducts(fallbackMore);
+          try {
+            const collectionProducts = await ensureCollectionProducts(SECONDARY_HANDLE, { limit: 4 });
+            if (cancelled) return;
+            if (collectionProducts?.length) {
+              setMoreProducts(collectionProducts.map((item) => toProductCard(item)).filter(Boolean));
+            } else {
+              setMoreProducts(fallbackMore);
+            }
+          } catch (collectionError) {
+            console.warn(`Failed to load collection "${SECONDARY_HANDLE}"`, collectionError);
+            setMoreProducts(fallbackMore);
+          }
         }
       } finally {
         if (!cancelled) {
@@ -154,7 +218,7 @@ export default function HomePage() {
       )}
 
       <ProductGrid
-        title="Latest Drop"
+        title={latestTitle}
         products={latestProducts}
         ctaHref="/products?category=t-shirts"
         ctaLabel="Shop Now"
@@ -165,7 +229,7 @@ export default function HomePage() {
       <VideoBanner />
 
       <ProductGrid
-        title="More From ARADHYA"
+        title={moreTitle}
         products={moreProducts}
         ctaHref="/products"
         ctaLabel="View All"

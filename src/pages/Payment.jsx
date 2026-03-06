@@ -28,9 +28,9 @@ const PAYMENT_METHODS = [
   {
     id: 'COD',
     label: 'Cash on Delivery',
-    description: 'Pay when the package is delivered.',
+    description: 'Pay Rs 50 now to book. Remaining amount will be collected on delivery.',
     icon: Banknote,
-    fee: 10,
+    fee: 0,
   },
   {
     id: 'UPI',
@@ -166,6 +166,9 @@ export default function Payment() {
   const appliedDiscount = draft?.appliedDiscount || null;
   const discountAmount = Number(appliedDiscount?.amount ?? draft?.totals?.discountAmount ?? 0);
   const finalTotal = Math.max(subtotal + shippingFee + paymentFee - discountAmount, 0);
+  const codAdvanceAmount = selectedPayment === 'COD' ? Math.min(50, finalTotal) : 0;
+  const payableNow = selectedPayment === 'COD' ? codAdvanceAmount : finalTotal;
+  const dueOnDelivery = selectedPayment === 'COD' ? Math.max(finalTotal - codAdvanceAmount, 0) : 0;
 
   const orderItems = useMemo(
     () =>
@@ -311,7 +314,7 @@ export default function Payment() {
       };
 
       let createdOrder = null;
-      if (selectedPayment === 'COD') {
+      if (selectedPayment !== 'COD') {
         createdOrder = await createOrder(token, payload);
       } else {
         const scriptReady = await loadRazorpayScript();
@@ -335,7 +338,10 @@ export default function Payment() {
             amount: razorpayOrderPayload?.order?.amount,
             currency: razorpayOrderPayload?.order?.currency || currency,
             name: 'Aradhya',
-            description: `Order payment (${selectedPayment})`,
+            description:
+              selectedPayment === 'COD'
+                ? 'COD booking advance payment'
+                : `Order payment (${selectedPayment})`,
             order_id: razorpayOrderPayload?.order?.id,
             prefill: {
               name: draft?.shipping?.fullName || '',
@@ -344,6 +350,8 @@ export default function Payment() {
             },
             notes: {
               checkoutMethod: selectedPayment,
+              payableNow: String(payableNow),
+              dueOnDelivery: String(dueOnDelivery),
             },
             theme: {
               color: '#000000',
@@ -578,10 +586,25 @@ export default function Payment() {
             ) : null}
             <div className="border-t border-gray-200 pt-2">
               <div className="flex justify-between text-base font-bold text-[var(--color-text-main)]">
-                <span>Total</span>
+                <span>Total Order Value</span>
                 <span>{formatMoney(finalTotal, currency)}</span>
               </div>
             </div>
+            {selectedPayment === 'COD' ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+                <div className="flex justify-between text-sm text-amber-900">
+                  <span>Pay now to book order</span>
+                  <span className="font-bold">{formatMoney(payableNow, currency)}</span>
+                </div>
+                <div className="mt-2 flex justify-between text-sm text-amber-900">
+                  <span>Pay on delivery</span>
+                  <span className="font-bold">{formatMoney(dueOnDelivery, currency)}</span>
+                </div>
+                <p className="mt-2 text-xs text-amber-800">
+                  Example: on a Rs 700 order, customer pays Rs 50 now and Rs 650 at delivery.
+                </p>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -620,9 +643,14 @@ export default function Payment() {
           disabled={placingOrder}
           className="w-full rounded-sm bg-black py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-gray-900 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
         >
-          {placingOrder ? 'Placing Order...' : `Place Order â€¢ ${formatMoney(finalTotal, currency)}`}
+          {placingOrder
+            ? 'Placing Order...'
+            : selectedPayment === 'COD'
+              ? `Pay ${formatMoney(payableNow, currency)} & Book COD Order`
+              : `Place Order • ${formatMoney(finalTotal, currency)}`}
         </button>
       </div>
     </div>
   );
 }
+

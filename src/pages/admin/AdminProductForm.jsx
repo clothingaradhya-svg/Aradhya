@@ -85,6 +85,12 @@ const RESERVED_CUSTOM_METAFIELD_KEYS = new Set([
   'bundle_items',
   'size_chart_image',
   'size_chart_text',
+  'homepage_featured',
+  'homepage_featured_order',
+  'homepage_featured_title',
+  'homepage_best_seller',
+  'homepage_best_seller_order',
+  'homepage_best_seller_title',
 ]);
 
 const normalizeToken = (value) => String(value || '').trim().toLowerCase();

@@ -9,6 +9,18 @@ const WEIGHT_UNITS = ['GRAMS', 'KILOGRAMS', 'OUNCES', 'POUNDS'];
 const PRODUCT_STATUS = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
 const APPAREL_TYPES = ['TOP', 'BOTTOM', 'SHOES', 'ACCESSORY', 'OTHER'];
 const METAFIELD_SETS = ['CATEGORY', 'PRODUCT'];
+const HOMEPAGE_SECTION_META = {
+  featured: {
+    enabledKey: 'homepage_featured',
+    orderKey: 'homepage_featured_order',
+    titleKey: 'homepage_featured_title',
+  },
+  bestSeller: {
+    enabledKey: 'homepage_best_seller',
+    orderKey: 'homepage_best_seller_order',
+    titleKey: 'homepage_best_seller_title',
+  },
+};
 
 const mediaSchema = z.object({
   url: z.string().min(1),
@@ -509,6 +521,17 @@ const productCompactSelect = {
   },
 };
 
+const productCompactWithMetafieldsSelect = {
+  ...productCompactSelect,
+  metafields: {
+    select: {
+      namespace: true,
+      key: true,
+      value: true,
+    },
+  },
+};
+
 const toDecimalString = (value) =>
   value !== undefined && value !== null ? value.toString() : null;
 
@@ -547,6 +570,54 @@ const toProductResponse = (product) => {
     averageRating,
     reviewCount,
   };
+};
+
+const normalizeMetaToken = (value) => String(value ?? '').trim().toLowerCase();
+
+const readHomepageMetafield = (product, key) => {
+  const metafields = Array.isArray(product?.metafields) ? product.metafields : [];
+  return (
+    metafields.find(
+      (field) =>
+        normalizeMetaToken(field?.namespace) === 'custom' &&
+        normalizeMetaToken(field?.key) === normalizeMetaToken(key),
+    ) ?? null
+  );
+};
+
+const readHomepageBoolean = (product, key) => {
+  const field = readHomepageMetafield(product, key);
+  const value = field?.value;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value > 0;
+  const token = normalizeMetaToken(value);
+  return ['true', '1', 'yes', 'y', 'on'].includes(token);
+};
+
+const readHomepageOrder = (product, key) => {
+  const field = readHomepageMetafield(product, key);
+  const raw = field?.value;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  const parsed = Number(String(raw ?? '').trim());
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+};
+
+const sortHomepageSectionProducts = (products, sectionConfig) =>
+  [...products].sort((left, right) => {
+    const orderDiff =
+      readHomepageOrder(left, sectionConfig.orderKey) -
+      readHomepageOrder(right, sectionConfig.orderKey);
+    if (orderDiff !== 0) return orderDiff;
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+  });
+
+const readHomepageSectionTitle = (products, sectionConfig) => {
+  for (const product of products) {
+    const field = readHomepageMetafield(product, sectionConfig.titleKey);
+    const value = String(field?.value ?? '').trim();
+    if (value) return value;
+  }
+  return '';
 };
 
 const HEAVY_WRITE_TRANSACTION_OPTIONS = {
@@ -623,6 +694,7 @@ exports.listProducts = async (req, res, next) => {
       limit,
       handles,
       include,
+      homepageSection,
     } = req.query;
     const searchValue = String(search ?? q ?? '').trim();
     const categoryValue = String(category ?? '').trim();
@@ -682,9 +754,13 @@ exports.listProducts = async (req, res, next) => {
     }
     const where = filters.length ? { AND: filters } : undefined;
     const includeMode = String(include ?? '').toLowerCase();
+    const homepageSectionValue = String(homepageSection ?? '').trim();
+    const homepageSectionConfig = HOMEPAGE_SECTION_META[homepageSectionValue] ?? null;
     const includeRelations =
       includeMode === 'full'
         ? { include: productInclude }
+        : homepageSectionConfig
+          ? { select: productCompactWithMetafieldsSelect }
         : includeMode === 'compact'
           ? { select: productCompactSelect }
           : { select: productListSelect };
@@ -700,6 +776,26 @@ exports.listProducts = async (req, res, next) => {
       : null;
 
     const fetchData = async () => {
+      if (homepageSectionConfig) {
+        const rows = await prisma.product.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          ...includeRelations,
+          take: 200,
+        });
+        const sectionRows = sortHomepageSectionProducts(
+          rows.filter((product) =>
+            readHomepageBoolean(product, homepageSectionConfig.enabledKey),
+          ),
+          homepageSectionConfig,
+        );
+        const pagedRows = sectionRows.slice(skip, skip + take);
+        return {
+          products: pagedRows,
+          total: sectionRows.length,
+          sectionTitle: readHomepageSectionTitle(sectionRows, homepageSectionConfig),
+        };
+      }
       if (skipCount) {
         const rows = await prisma.product.findMany({
           where,
@@ -728,6 +824,14 @@ exports.listProducts = async (req, res, next) => {
       : await fetchData();
     products = result.products;
     total = result.total;
+    const responseMeta = {
+      total,
+      page: pageNumber,
+      limit: take,
+    };
+    if (homepageSectionConfig && result.sectionTitle) {
+      responseMeta.sectionTitle = result.sectionTitle;
+    }
 
     if (!isAdminRoute) {
       res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
@@ -742,7 +846,7 @@ exports.listProducts = async (req, res, next) => {
         sampleHandles: mapped.slice(0, 5).map((item) => item.handle),
       });
     }
-    return sendSuccess(res, mapped, { total, page: pageNumber, limit: take });
+    return sendSuccess(res, mapped, responseMeta);
   } catch (error) {
     return next(error);
   }
