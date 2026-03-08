@@ -5,6 +5,7 @@ const { protect, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
+router.get('/auth-config', userController.getGoogleAuthConfig);
 router.post('/signup', userController.signup);
 router.post('/signin', userController.signin);
 router.post('/google', userController.googleSignin);

@@ -9,7 +9,11 @@ import {
   updateProfile as updateProfileApi,
   updatePassword as updatePasswordApi,
 } from '../lib/api';
-import { isFirebaseGoogleConfigured, signInWithGooglePopup } from '../lib/firebase';
+import {
+  checkFirebaseGoogleAvailability,
+  isFirebaseGoogleConfigured,
+  signInWithGooglePopup,
+} from '../lib/firebase';
 
 const AuthContext = createContext(null);
 
@@ -20,6 +24,9 @@ export function AuthProvider({ children }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [canUseGoogleAuth, setCanUseGoogleAuth] = useState(
+    () => isFirebaseGoogleConfigured() || typeof window !== 'undefined',
+  );
 
   const getStoredToken = useCallback(() => {
     try {
@@ -82,6 +89,25 @@ export function AuthProvider({ children }) {
     }
   }, [getStoredToken, fetchCustomer]);
 
+  useEffect(() => {
+    let active = true;
+
+    if (isFirebaseGoogleConfigured()) {
+      setCanUseGoogleAuth(true);
+      return undefined;
+    }
+
+    checkFirebaseGoogleAvailability().then((available) => {
+      if (active) {
+        setCanUseGoogleAuth(available);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const login = useCallback(
     async (email, password) => {
       setError(null);
@@ -120,10 +146,6 @@ export function AuthProvider({ children }) {
     setLoading(true);
 
     try {
-      if (!isFirebaseGoogleConfigured) {
-        throw new Error('Google sign-in is not configured. Please contact support.');
-      }
-
       const googleAuth = await signInWithGooglePopup();
       const result = await signInWithGoogleApi({
         idToken: googleAuth.idToken,
@@ -156,6 +178,8 @@ export function AuthProvider({ children }) {
             ? 'Popup blocked. Please allow popups and try again.'
             : firebaseCode === 'auth/cancelled-popup-request'
               ? 'Google sign-in was interrupted. Please try again.'
+              : firebaseCode === 'auth/unauthorized-domain'
+                ? 'This website domain is not yet authorized for Google sign-in in Firebase.'
               : e?.message || 'Google sign-in failed';
       setError(msg);
       setLoading(false);
@@ -238,7 +262,7 @@ export function AuthProvider({ children }) {
     changeCustomerPassword,
     getAuthToken: getStoredToken,
     refreshCustomer: () => fetchCustomer(getStoredToken()),
-    canUseGoogleAuth: isFirebaseGoogleConfigured,
+    canUseGoogleAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

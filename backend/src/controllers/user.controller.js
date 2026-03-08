@@ -3,7 +3,10 @@ const crypto = require('crypto');
 const { z } = require('zod');
 
 const { getPrisma } = require('../db/prismaClient');
-const { verifyFirebaseIdToken } = require('../utils/firebaseAdmin');
+const {
+  getFirebasePublicConfig,
+  verifyFirebaseIdToken,
+} = require('../utils/firebaseAdmin');
 const { signToken } = require('../utils/jwt');
 const { sendSuccess, sendError } = require('../utils/response');
 
@@ -173,6 +176,16 @@ exports.googleSignin = async (req, res, next) => {
     }
     return handleError(error, res, next);
   }
+};
+
+exports.getGoogleAuthConfig = (_req, res) => {
+  const config = getFirebasePublicConfig();
+  const enabled = Boolean(config.apiKey && config.projectId && config.authDomain);
+
+  return sendSuccess(res, {
+    enabled,
+    ...config,
+  });
 };
 
 exports.getProfile = async (req, res, next) => {
