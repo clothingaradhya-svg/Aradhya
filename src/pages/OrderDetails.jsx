@@ -16,8 +16,15 @@ const formatDate = (value) => {
   });
 };
 
-const statusMeta = (status) => {
-  const normalized = String(status || '').toUpperCase();
+const hasPaymentConfirmation = (order) =>
+  Number(order?.totals?.paidAmount ?? 0) > 0 ||
+  Boolean(order?.totals?.paymentConfirmedAt) ||
+  Boolean(order?.shipping?.paymentId);
+
+const statusMeta = (order) => {
+  const normalized = String(order?.status || '').toUpperCase();
+  const advanceRequired = Boolean(order?.totals?.advanceRequired);
+  const paymentConfirmed = hasPaymentConfirmation(order);
   if (normalized === 'FULFILLED') {
     return {
       label: 'Delivered',
@@ -30,6 +37,13 @@ const statusMeta = (status) => {
       label: 'Paid',
       tone: 'text-blue-700 bg-blue-50 border-blue-200',
       Icon: Truck,
+    };
+  }
+  if (normalized === 'PENDING' && paymentConfirmed && advanceRequired) {
+    return {
+      label: 'Advance Paid',
+      tone: 'text-blue-700 bg-blue-50 border-blue-200',
+      Icon: CheckCircle2,
     };
   }
   if (normalized === 'PENDING') {
@@ -126,7 +140,7 @@ export default function OrderDetails() {
           </div>
         ) : (
           sortedOrders.map((order) => {
-            const meta = statusMeta(order?.status);
+            const meta = statusMeta(order);
             const Icon = meta.Icon;
             const items = Array.isArray(order?.items) ? order.items : [];
             const currency = order?.totals?.currency || 'INR';

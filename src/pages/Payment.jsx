@@ -333,81 +333,76 @@ export default function Payment() {
           : undefined,
       };
 
-      let createdOrder = null;
-      if (selectedPayment !== 'COD') {
-        createdOrder = await createOrder(token, payload);
-      } else {
-        const scriptReady = await loadRazorpayScript();
-        if (!scriptReady || !window.Razorpay) {
-          throw new Error('Unable to load Razorpay checkout. Please try again.');
-        }
-
-        const razorpayOrderPayload = await createRazorpayOrder(token, {
-          order: payload,
-          receipt: `rcpt_${Date.now()}`,
-          notes: {
-            customerEmail: draft?.shipping?.email || '',
-            customerPhone: draft?.shipping?.phone || '',
-            discountCode: appliedDiscount?.code || '',
-          },
-        });
-
-        createdOrder = await new Promise((resolve, reject) => {
-          const options = {
-            key: razorpayOrderPayload?.keyId,
-            amount: razorpayOrderPayload?.order?.amount,
-            currency: razorpayOrderPayload?.order?.currency || currency,
-            name: 'Aradhya',
-            description:
-              selectedPayment === 'COD'
-                ? 'COD booking advance payment'
-                : `Order payment (${selectedPayment})`,
-            order_id: razorpayOrderPayload?.order?.id,
-            prefill: {
-              name: draft?.shipping?.fullName || '',
-              email: draft?.shipping?.email || '',
-              contact: draft?.shipping?.phone || '',
-            },
-            notes: {
-              checkoutMethod: selectedPayment,
-              payableNow: String(payableNow),
-              dueOnDelivery: String(dueOnDelivery),
-            },
-            theme: {
-              color: '#000000',
-            },
-            modal: {
-              ondismiss: () => reject(new Error('Payment cancelled.')),
-            },
-            handler: async (response) => {
-              try {
-                const confirmedOrder = await confirmRazorpayCheckout(token, {
-                  payment: {
-                    razorpayOrderId: response?.razorpay_order_id,
-                    razorpayPaymentId: response?.razorpay_payment_id,
-                    razorpaySignature: response?.razorpay_signature,
-                  },
-                  order: payload,
-                });
-                resolve(confirmedOrder);
-              } catch (verificationErr) {
-                reject(verificationErr);
-              }
-            },
-          };
-
-          const razorpay = new window.Razorpay(options);
-          razorpay.on('payment.failed', (event) => {
-            const reason =
-              event?.error?.description ||
-              event?.error?.reason ||
-              event?.error?.code ||
-              'Payment failed.';
-            reject(new Error(reason));
-          });
-          razorpay.open();
-        });
+      const scriptReady = await loadRazorpayScript();
+      if (!scriptReady || !window.Razorpay) {
+        throw new Error('Unable to load Razorpay checkout. Please try again.');
       }
+
+      const razorpayOrderPayload = await createRazorpayOrder(token, {
+        order: payload,
+        receipt: `rcpt_${Date.now()}`,
+        notes: {
+          customerEmail: draft?.shipping?.email || '',
+          customerPhone: draft?.shipping?.phone || '',
+          discountCode: appliedDiscount?.code || '',
+        },
+      });
+
+      const createdOrder = await new Promise((resolve, reject) => {
+        const options = {
+          key: razorpayOrderPayload?.keyId,
+          amount: razorpayOrderPayload?.order?.amount,
+          currency: razorpayOrderPayload?.order?.currency || currency,
+          name: 'Aradhya',
+          description:
+            selectedPayment === 'COD'
+              ? 'COD booking advance payment'
+              : `Order payment (${selectedPayment})`,
+          order_id: razorpayOrderPayload?.order?.id,
+          prefill: {
+            name: draft?.shipping?.fullName || '',
+            email: draft?.shipping?.email || '',
+            contact: draft?.shipping?.phone || '',
+          },
+          notes: {
+            checkoutMethod: selectedPayment,
+            payableNow: String(payableNow),
+            dueOnDelivery: String(dueOnDelivery),
+          },
+          theme: {
+            color: '#000000',
+          },
+          modal: {
+            ondismiss: () => reject(new Error('Payment cancelled.')),
+          },
+          handler: async (response) => {
+            try {
+              const confirmedOrder = await confirmRazorpayCheckout(token, {
+                payment: {
+                  razorpayOrderId: response?.razorpay_order_id,
+                  razorpayPaymentId: response?.razorpay_payment_id,
+                  razorpaySignature: response?.razorpay_signature,
+                },
+                order: payload,
+              });
+              resolve(confirmedOrder);
+            } catch (verificationErr) {
+              reject(verificationErr);
+            }
+          },
+        };
+
+        const razorpay = new window.Razorpay(options);
+        razorpay.on('payment.failed', (event) => {
+          const reason =
+            event?.error?.description ||
+            event?.error?.reason ||
+            event?.error?.code ||
+            'Payment failed.';
+          reject(new Error(reason));
+        });
+        razorpay.open();
+      });
 
       (draft.items || []).forEach((item) => {
         removeItem(item.slug, item.size ?? null);

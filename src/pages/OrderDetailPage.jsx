@@ -41,8 +41,15 @@ const formatDateTime = (value) => {
   });
 };
 
-const statusMeta = (status) => {
-  const normalized = String(status || '').toUpperCase();
+const hasPaymentConfirmation = (order) =>
+  Number(order?.totals?.paidAmount ?? 0) > 0 ||
+  Boolean(order?.totals?.paymentConfirmedAt) ||
+  Boolean(order?.shipping?.paymentId);
+
+const statusMeta = (order) => {
+  const normalized = String(order?.status || '').toUpperCase();
+  const advanceRequired = Boolean(order?.totals?.advanceRequired);
+  const paymentConfirmed = hasPaymentConfirmation(order);
   if (normalized === 'FULFILLED') {
     return {
       label: 'Delivered',
@@ -57,6 +64,14 @@ const statusMeta = (status) => {
       tone: 'text-blue-700 bg-blue-50 border-blue-200',
       Icon: Truck,
       description: 'Payment confirmed. Your order is being processed.',
+    };
+  }
+  if (normalized === 'PENDING' && paymentConfirmed && advanceRequired) {
+    return {
+      label: 'Advance Paid',
+      tone: 'text-blue-700 bg-blue-50 border-blue-200',
+      Icon: CheckCircle,
+      description: 'Advance payment confirmed. Your order is booked and being processed.',
     };
   }
   if (normalized === 'PENDING') {
@@ -145,7 +160,8 @@ const OrderDetailPage = () => {
     );
   }
 
-  const meta = statusMeta(order.status);
+  const paymentConfirmed = hasPaymentConfirmation(order);
+  const meta = statusMeta(order);
   const Icon = meta.Icon;
   const items = Array.isArray(order.items) ? order.items : [];
   const currency = order.totals?.currency || 'INR';
@@ -160,6 +176,7 @@ const OrderDetailPage = () => {
   const paidAmount = Number(order.totals?.paidAmount ?? 0);
   const advanceRequired = Boolean(order.totals?.advanceRequired);
   const shipping = order.shipping || {};
+  const paymentConfirmedAt = order.totals?.paymentConfirmedAt || order.updatedAt;
 
   const statusToken = String(order.status || '').toUpperCase();
   const timeline =
@@ -183,13 +200,13 @@ const OrderDetailPage = () => {
             status: 'Order Placed',
             date: formatDateTime(order.createdAt),
             completed: true,
-            current: order.status === 'PENDING',
+            current: order.status === 'PENDING' && !paymentConfirmed,
           },
           {
             status: advanceRequired ? 'Advance Paid' : 'Payment Confirmed',
-            date: order.status !== 'PENDING' ? formatDateTime(order.updatedAt) : '-',
-            completed: order.status !== 'PENDING',
-            current: order.status === 'PAID',
+            date: paymentConfirmed ? formatDateTime(paymentConfirmedAt) : '-',
+            completed: paymentConfirmed,
+            current: paymentConfirmed && order.status !== 'FULFILLED',
           },
           {
             status: 'Delivered',
