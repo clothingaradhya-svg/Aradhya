@@ -12,6 +12,7 @@ const {
   calculateDiscountAmount,
 } = require("../utils/discounts");
 
+const COD_ADVANCE_AMOUNT = 50;
 const PAYMENT_FEES = {
   COD: 0,
 };
@@ -208,11 +209,12 @@ const getPaymentBreakdown = (paymentMethod, total) => {
   const normalizedTotal = roundMoney(Math.max(toMoney(total, 0), 0));
 
   if (normalizedMethod === "COD") {
+    const payableNow = roundMoney(Math.min(COD_ADVANCE_AMOUNT, normalizedTotal));
     return {
-      advanceRequired: false,
-      advanceAmount: 0,
-      payableNow: 0,
-      dueOnDelivery: normalizedTotal,
+      advanceRequired: true,
+      advanceAmount: payableNow,
+      payableNow,
+      dueOnDelivery: roundMoney(Math.max(normalizedTotal - payableNow, 0)),
     };
   }
 
@@ -347,20 +349,25 @@ const verifyRazorpaySignature = ({ razorpayOrderId, razorpayPaymentId, razorpayS
 exports.createOrder = async (req, res, next) => {
   try {
     const payload = createOrderSchema.parse(req.body);
+    if (normalizePaymentMethod(payload.paymentMethod) === "COD") {
+      return sendError(
+        res,
+        400,
+        `Cash on Delivery requires a prepaid booking amount of Rs ${COD_ADVANCE_AMOUNT}.`,
+      );
+    }
     const prisma = await getPrisma();
     const canonicalTotals = await calculateCanonicalTotals(prisma, payload);
-    const normalizedMethod = normalizePaymentMethod(payload.paymentMethod);
 
     const order = await prisma.order.create({
       data: {
         number: createOrderNumber(),
-        status: normalizedMethod === "COD" ? OrderStatus.PENDING : OrderStatus.PAID,
+        status: OrderStatus.PAID,
         paymentMethod: payload.paymentMethod,
         totals: {
           ...canonicalTotals,
-          paidAmount: normalizedMethod === "COD" ? 0 : canonicalTotals.total,
-          paymentConfirmedAt:
-            normalizedMethod === "COD" ? null : new Date().toISOString(),
+          paidAmount: canonicalTotals.total,
+          paymentConfirmedAt: new Date().toISOString(),
         },
         shipping: payload.shipping,
         items: payload.items,
