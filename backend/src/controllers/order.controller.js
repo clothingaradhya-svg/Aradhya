@@ -12,8 +12,6 @@ const {
   calculateDiscountAmount,
 } = require("../utils/discounts");
 
-const FREE_SHIPPING_THRESHOLD = 5000;
-const STANDARD_SHIPPING_FEE = 100;
 const COD_ADVANCE_AMOUNT = 50;
 const PAYMENT_FEES = {
   COD: 0,
@@ -201,8 +199,7 @@ const calculateSubtotalFromItems = (items = []) =>
     }, 0),
   );
 
-const calculateShippingFee = (subtotal) =>
-  subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
+const calculateShippingFee = () => 0;
 
 const calculatePaymentFee = (paymentMethod) =>
   toMoney(PAYMENT_FEES[normalizePaymentMethod(paymentMethod)] || 0, 0);

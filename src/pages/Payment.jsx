@@ -116,7 +116,25 @@ export default function Payment() {
       return;
     }
 
-    setDraft(currentDraft);
+    const normalizedDraft = {
+      ...currentDraft,
+      totals: {
+        ...currentDraft.totals,
+        shippingFee: 0,
+        total: Math.max(
+          Number(currentDraft?.totals?.subtotal ?? 0) +
+            Number(currentDraft?.totals?.paymentFee ?? 0) -
+            Number(
+              currentDraft?.appliedDiscount?.amount ??
+                currentDraft?.totals?.discountAmount ??
+                0,
+            ),
+          0,
+        ),
+      },
+    };
+    setDraft(normalizedDraft);
+    setCheckoutDraft(normalizedDraft);
     setSelectedPayment(currentDraft.paymentMethod || 'COD');
     setDiscountCodeInput(currentDraft?.appliedDiscount?.code || currentDraft?.totals?.discountCode || '');
     setDiscountMessage('');
@@ -126,7 +144,7 @@ export default function Payment() {
     setDraft((prev) => {
       if (!prev) return prev;
       const currentSubtotal = Number(prev?.totals?.subtotal ?? 0);
-      const currentShippingFee = Number(prev?.totals?.shippingFee ?? 0);
+      const currentShippingFee = 0;
       const nextPaymentFee = Number(getPaymentMethodMeta(selectedPayment)?.fee || 0);
       const activeDiscount = prev.appliedDiscount || null;
       const activeDiscountAmount = Number(
@@ -141,6 +159,7 @@ export default function Payment() {
         paymentMethod: selectedPayment,
         totals: {
           ...prev.totals,
+          shippingFee: 0,
           paymentFee: nextPaymentFee,
           discountAmount: activeDiscountAmount,
           discountCode: activeDiscount?.code || prev?.totals?.discountCode || null,
@@ -160,7 +179,7 @@ export default function Payment() {
 
   const currency = draft?.totals?.currency || 'INR';
   const subtotal = Number(draft?.totals?.subtotal ?? 0);
-  const shippingFee = Number(draft?.totals?.shippingFee ?? 0);
+  const shippingFee = 0;
   const selectedMethodMeta = getPaymentMethodMeta(selectedPayment);
   const paymentFee = Number(selectedMethodMeta?.fee || 0);
   const appliedDiscount = draft?.appliedDiscount || null;
@@ -205,6 +224,7 @@ export default function Payment() {
       appliedDiscount: normalizedDiscount,
       totals: {
         ...draft.totals,
+        shippingFee: 0,
         paymentFee,
         discountAmount: nextDiscountAmount,
         discountCode: normalizedDiscount?.code || null,
@@ -296,7 +316,7 @@ export default function Payment() {
         paymentMethod: selectedPayment,
         totals: {
           subtotal,
-          shippingFee,
+          shippingFee: 0,
           paymentFee,
           discountAmount,
           discountCode: appliedDiscount?.code || null,
@@ -568,8 +588,8 @@ export default function Payment() {
               <span>{formatMoney(subtotal, currency)}</span>
             </div>
             <div className="flex justify-between text-gray-700">
-              <span>Shipping</span>
-              <span>{shippingFee > 0 ? formatMoney(shippingFee, currency) : 'Free'}</span>
+              <span>Delivery</span>
+              <span className="font-semibold text-emerald-600">Free</span>
             </div>
             <div className="flex justify-between text-gray-700">
               <span>{selectedMethodMeta.label} fee</span>
@@ -610,7 +630,7 @@ export default function Payment() {
 
         {!isAuthenticated ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-            <span className="font-bold">⚠</span>
+            <span className="font-bold">!</span>
             <div>
               <p className="font-semibold">Login Required</p>
               <p className="text-xs mt-1">Please login to place this order.</p>
@@ -620,7 +640,7 @@ export default function Payment() {
 
         {error ? (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-2">
-            <span className="font-bold">✕</span>
+            <span className="font-bold">x</span>
             <div className="flex-1">
               <p className="font-semibold">Error</p>
               <p className="text-xs mt-1">{error}</p>
@@ -647,7 +667,7 @@ export default function Payment() {
             ? 'Placing Order...'
             : selectedPayment === 'COD'
               ? `Pay ${formatMoney(payableNow, currency)} & Book COD Order`
-              : `Place Order � ${formatMoney(finalTotal, currency)}`}
+              : `Place Order - ${formatMoney(finalTotal, currency)}`}
         </button>
       </div>
     </div>

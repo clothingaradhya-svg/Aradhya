@@ -85,11 +85,7 @@ export default function Address() {
     [lineItems],
   );
   
-  // Calculate shipping fee based on subtotal (free shipping over 5000)
-  const shippingFee = useMemo(() => {
-    const freeShippingThreshold = 5000;
-    return subtotal >= freeShippingThreshold ? 0 : 100; // 100 INR shipping fee
-  }, [subtotal]);
+  const shippingFee = 0;
   
   const finalTotal = Math.max(subtotal + shippingFee + paymentFee - discountAmount, 0);
 
@@ -175,9 +171,7 @@ export default function Address() {
       ? persistAddress(shipping, savedAddresses.length === 0)
       : shipping;
 
-    // Calculate shipping fee
-    const freeShippingThreshold = 5000;
-    const calculatedShippingFee = subtotal >= freeShippingThreshold ? 0 : 100;
+    const calculatedShippingFee = 0;
     const currentPaymentFee = Number(draft?.totals?.paymentFee ?? 0);
     const currentDiscountAmount = Number(
       draft?.appliedDiscount?.amount ?? draft?.totals?.discountAmount ?? 0,
@@ -352,20 +346,9 @@ export default function Address() {
             <span className="text-gray-700">{formatMoney(subtotal, currency)}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-gray-600">Shipping</span>
-            <span className="text-gray-700">
-              {shippingFee === 0 ? (
-                <span className="text-emerald-600 font-semibold">Free</span>
-              ) : (
-                formatMoney(shippingFee, currency)
-              )}
-            </span>
+            <span className="text-gray-600">Delivery</span>
+            <span className="font-semibold text-emerald-600">Free</span>
           </div>
-          {subtotal < 5000 && shippingFee > 0 && (
-            <p className="text-xs text-emerald-600 text-right">
-              Add {formatMoney(5000 - subtotal, currency)} more for free shipping
-            </p>
-          )}
           {discountAmount > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-gray-600">Discount</span>
