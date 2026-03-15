@@ -66,18 +66,40 @@ const getPaymentMethodMeta = (methodId) =>
   PAYMENT_METHODS.find((item) => item.id === methodId) || PAYMENT_METHODS[0];
 
 const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
+const RAZORPAY_SCRIPT_TIMEOUT_MS = 15000;
+const PAYMENT_REQUEST_TIMEOUT_MS = 20000;
+const PAYMENT_MODAL_TIMEOUT_MS = 45000;
 let razorpayScriptPromise = null;
+
+const withTimeout = (promise, ms, message) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(message));
+    }, ms);
+
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
 
 const loadRazorpayScript = () => {
   if (typeof window === 'undefined') return Promise.resolve(false);
   if (window.Razorpay) return Promise.resolve(true);
   if (razorpayScriptPromise) return razorpayScriptPromise;
 
-  razorpayScriptPromise = new Promise((resolve) => {
+  razorpayScriptPromise = withTimeout(
+    new Promise((resolve) => {
     const existing = document.querySelector(`script[src="${RAZORPAY_SCRIPT_URL}"]`);
     if (existing) {
-      existing.addEventListener('load', () => resolve(Boolean(window.Razorpay)));
-      existing.addEventListener('error', () => resolve(false));
+      setTimeout(() => resolve(Boolean(window.Razorpay)), 0);
+      existing.addEventListener('load', () => resolve(Boolean(window.Razorpay)), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
       return;
     }
 
@@ -87,6 +109,11 @@ const loadRazorpayScript = () => {
     script.onload = () => resolve(Boolean(window.Razorpay));
     script.onerror = () => resolve(false);
     document.body.appendChild(script);
+    }),
+    RAZORPAY_SCRIPT_TIMEOUT_MS,
+    'Razorpay checkout timed out while loading. Please try again.',
+  ).finally(() => {
+    razorpayScriptPromise = null;
   });
 
   return razorpayScriptPromise;
@@ -338,71 +365,83 @@ export default function Payment() {
         throw new Error('Unable to load Razorpay checkout. Please try again.');
       }
 
-      const razorpayOrderPayload = await createRazorpayOrder(token, {
-        order: payload,
-        receipt: `rcpt_${Date.now()}`,
-        notes: {
-          customerEmail: draft?.shipping?.email || '',
-          customerPhone: draft?.shipping?.phone || '',
-          discountCode: appliedDiscount?.code || '',
-        },
-      });
-
-      const createdOrder = await new Promise((resolve, reject) => {
-        const options = {
-          key: razorpayOrderPayload?.keyId,
-          amount: razorpayOrderPayload?.order?.amount,
-          currency: razorpayOrderPayload?.order?.currency || currency,
-          name: 'Aradhya',
-          description:
-            selectedPayment === 'COD'
-              ? 'COD booking advance payment'
-              : `Order payment (${selectedPayment})`,
-          order_id: razorpayOrderPayload?.order?.id,
-          prefill: {
-            name: draft?.shipping?.fullName || '',
-            email: draft?.shipping?.email || '',
-            contact: draft?.shipping?.phone || '',
-          },
+      const razorpayOrderPayload = await withTimeout(
+        createRazorpayOrder(token, {
+          order: payload,
+          receipt: `rcpt_${Date.now()}`,
           notes: {
-            checkoutMethod: selectedPayment,
-            payableNow: String(payableNow),
-            dueOnDelivery: String(dueOnDelivery),
+            customerEmail: draft?.shipping?.email || '',
+            customerPhone: draft?.shipping?.phone || '',
+            discountCode: appliedDiscount?.code || '',
           },
-          theme: {
-            color: '#000000',
-          },
-          modal: {
-            ondismiss: () => reject(new Error('Payment cancelled.')),
-          },
-          handler: async (response) => {
-            try {
-              const confirmedOrder = await confirmRazorpayCheckout(token, {
-                payment: {
-                  razorpayOrderId: response?.razorpay_order_id,
-                  razorpayPaymentId: response?.razorpay_payment_id,
-                  razorpaySignature: response?.razorpay_signature,
-                },
-                order: payload,
-              });
-              resolve(confirmedOrder);
-            } catch (verificationErr) {
-              reject(verificationErr);
-            }
-          },
-        };
+        }),
+        PAYMENT_REQUEST_TIMEOUT_MS,
+        'Unable to create payment request right now. Please try again.',
+      );
 
-        const razorpay = new window.Razorpay(options);
-        razorpay.on('payment.failed', (event) => {
-          const reason =
-            event?.error?.description ||
-            event?.error?.reason ||
-            event?.error?.code ||
-            'Payment failed.';
-          reject(new Error(reason));
-        });
-        razorpay.open();
-      });
+      const createdOrder = await withTimeout(
+        new Promise((resolve, reject) => {
+          const options = {
+            key: razorpayOrderPayload?.keyId,
+            amount: razorpayOrderPayload?.order?.amount,
+            currency: razorpayOrderPayload?.order?.currency || currency,
+            name: 'Aradhya',
+            description:
+              selectedPayment === 'COD'
+                ? 'COD booking advance payment'
+                : `Order payment (${selectedPayment})`,
+            order_id: razorpayOrderPayload?.order?.id,
+            prefill: {
+              name: draft?.shipping?.fullName || '',
+              email: draft?.shipping?.email || '',
+              contact: draft?.shipping?.phone || '',
+            },
+            notes: {
+              checkoutMethod: selectedPayment,
+              payableNow: String(payableNow),
+              dueOnDelivery: String(dueOnDelivery),
+            },
+            theme: {
+              color: '#000000',
+            },
+            modal: {
+              ondismiss: () => reject(new Error('Payment cancelled.')),
+            },
+            handler: async (response) => {
+              try {
+                const confirmedOrder = await withTimeout(
+                  confirmRazorpayCheckout(token, {
+                    payment: {
+                      razorpayOrderId: response?.razorpay_order_id,
+                      razorpayPaymentId: response?.razorpay_payment_id,
+                      razorpaySignature: response?.razorpay_signature,
+                    },
+                    order: payload,
+                  }),
+                  PAYMENT_REQUEST_TIMEOUT_MS,
+                  'Payment was captured but order confirmation timed out. Please check My Orders.',
+                );
+                resolve(confirmedOrder);
+              } catch (verificationErr) {
+                reject(verificationErr);
+              }
+            },
+          };
+
+          const razorpay = new window.Razorpay(options);
+          razorpay.on('payment.failed', (event) => {
+            const reason =
+              event?.error?.description ||
+              event?.error?.reason ||
+              event?.error?.code ||
+              'Payment failed.';
+            reject(new Error(reason));
+          });
+          razorpay.open();
+        }),
+        PAYMENT_MODAL_TIMEOUT_MS,
+        'Payment window did not open in time. Please try again.',
+      );
 
       (draft.items || []).forEach((item) => {
         removeItem(item.slug, item.size ?? null);
