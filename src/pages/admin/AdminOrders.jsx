@@ -494,7 +494,7 @@ const AdminOrders = () => {
                                 </p>
                                 <button
                                   type="button"
-                                  onClick={() => handleSaveTracking(order)}
+                                  onClick={() => saveTracking(order.id)}
                                   disabled={savingTrackingOrderId === order.id}
                                   className="rounded border border-emerald-500/40 px-3 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-60"
                                 >

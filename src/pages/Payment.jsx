@@ -1,17 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BadgePercent,
   Banknote,
   CreditCard,
   Landmark,
+  ShieldCheck,
   Smartphone,
   Wallet,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  confirmRazorpayCheckout,
-  createRazorpayOrder,
+  createFastrrCheckoutSession,
+  fetchFastrrCheckoutStatus,
+  fetchFastrrConfig,
   formatMoney,
   verifyDiscountCode,
 } from '../lib/api';
@@ -25,56 +27,54 @@ import {
 
 const PAYMENT_METHODS = [
   {
-    id: 'COD',
-    label: 'Cash on Delivery',
-    description: 'Pay Rs 50 now to book. Remaining amount will be collected on delivery.',
-    icon: Banknote,
-    fee: 0,
-  },
-  {
     id: 'UPI',
     label: 'UPI',
-    description: 'Pay instantly via any UPI app.',
+    description: 'Show UPI as the preferred payment choice inside Shiprocket checkout.',
     icon: Smartphone,
-    fee: 0,
   },
   {
     id: 'CARD',
     label: 'Credit / Debit Card',
-    description: 'Visa, Mastercard, Rupay and more.',
+    description: 'Prefer card payment when the secure Shiprocket checkout opens.',
     icon: CreditCard,
-    fee: 0,
   },
   {
     id: 'NET_BANKING',
     label: 'Net Banking',
-    description: 'Secure transfer from your bank account.',
+    description: 'Prefer bank transfer when payment options are shown.',
     icon: Landmark,
-    fee: 0,
   },
   {
     id: 'WALLET',
     label: 'Wallets',
-    description: 'Paytm, PhonePe, Amazon Pay and others.',
+    description: 'Prefer wallet payment options if available.',
     icon: Wallet,
-    fee: 0,
+  },
+  {
+    id: 'COD',
+    label: 'Cash on Delivery',
+    description: 'Prefer COD if Shiprocket enables it for the order and delivery address.',
+    icon: Banknote,
   },
 ];
 
 const getPaymentMethodMeta = (methodId) =>
   PAYMENT_METHODS.find((item) => item.id === methodId) || PAYMENT_METHODS[0];
 
-const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
-const RAZORPAY_SCRIPT_TIMEOUT_MS = 15000;
-const PAYMENT_REQUEST_TIMEOUT_MS = 20000;
-const PAYMENT_MODAL_TIMEOUT_MS = 45000;
-let razorpayScriptPromise = null;
+const SHIPROCKET_SCRIPT_URL =
+  'https://checkout-ui.shiprocket.com/assets/js/channels/shopify.js';
+const SHIPROCKET_STYLE_URL =
+  'https://checkout-ui.shiprocket.com/assets/styles/shopify.css';
+const SHIPROCKET_ASSET_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 20000;
+
+let shiprocketAssetsPromise = null;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const withTimeout = (promise, ms, message) =>
   new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(message));
-    }, ms);
+    const timer = setTimeout(() => reject(new Error(message)), ms);
 
     Promise.resolve(promise)
       .then((value) => {
@@ -87,98 +87,179 @@ const withTimeout = (promise, ms, message) =>
       });
   });
 
-const loadRazorpayScript = () => {
+const ensureShiprocketStylesheet = (href) => {
+  if (typeof document === 'undefined' || !href) return;
+  const existing = document.querySelector(`link[data-shiprocket-style="${href}"]`);
+  if (existing) return;
+
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  link.dataset.shiprocketStyle = href;
+  document.head.appendChild(link);
+};
+
+const loadShiprocketAssets = (scriptUrl, styleUrl) => {
   if (typeof window === 'undefined') return Promise.resolve(false);
-  if (window.Razorpay) return Promise.resolve(true);
-  if (razorpayScriptPromise) return razorpayScriptPromise;
+  if (window.HeadlessCheckout?.addToCart) {
+    ensureShiprocketStylesheet(styleUrl);
+    return Promise.resolve(true);
+  }
+  if (shiprocketAssetsPromise) return shiprocketAssetsPromise;
 
-  razorpayScriptPromise = withTimeout(
+  ensureShiprocketStylesheet(styleUrl);
+
+  shiprocketAssetsPromise = withTimeout(
     new Promise((resolve) => {
-    const existing = document.querySelector(`script[src="${RAZORPAY_SCRIPT_URL}"]`);
-    if (existing) {
-      setTimeout(() => resolve(Boolean(window.Razorpay)), 0);
-      existing.addEventListener('load', () => resolve(Boolean(window.Razorpay)), { once: true });
-      existing.addEventListener('error', () => resolve(false), { once: true });
-      return;
-    }
+      const src = scriptUrl || SHIPROCKET_SCRIPT_URL;
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) {
+        existing.addEventListener(
+          'load',
+          () => resolve(Boolean(window.HeadlessCheckout?.addToCart)),
+          { once: true },
+        );
+        existing.addEventListener('error', () => resolve(false), { once: true });
+        setTimeout(() => resolve(Boolean(window.HeadlessCheckout?.addToCart)), 0);
+        return;
+      }
 
-    const script = document.createElement('script');
-    script.src = RAZORPAY_SCRIPT_URL;
-    script.async = true;
-    script.onload = () => resolve(Boolean(window.Razorpay));
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => resolve(Boolean(window.HeadlessCheckout?.addToCart));
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
     }),
-    RAZORPAY_SCRIPT_TIMEOUT_MS,
-    'Razorpay checkout timed out while loading. Please try again.',
+    SHIPROCKET_ASSET_TIMEOUT_MS,
+    'Shiprocket checkout assets timed out while loading. Please try again.',
   ).finally(() => {
-    razorpayScriptPromise = null;
+    shiprocketAssetsPromise = null;
   });
 
-  return razorpayScriptPromise;
+  return shiprocketAssetsPromise;
 };
+
+const buildSafeDraft = (draft) => ({
+  createdAt: draft?.createdAt || new Date().toISOString(),
+  items: Array.isArray(draft?.items) ? draft.items : [],
+  shipping: draft?.shipping || {},
+  appliedDiscount: draft?.appliedDiscount || null,
+  totals: {
+    subtotal: Number(draft?.totals?.subtotal ?? 0),
+    shippingFee: 0,
+    paymentFee: 0,
+    discountAmount: Number(
+      draft?.appliedDiscount?.amount ?? draft?.totals?.discountAmount ?? 0,
+    ),
+    discountCode: draft?.appliedDiscount?.code || draft?.totals?.discountCode || null,
+    total: Math.max(
+      Number(draft?.totals?.subtotal ?? 0) -
+        Number(draft?.appliedDiscount?.amount ?? draft?.totals?.discountAmount ?? 0),
+      0,
+    ),
+    currency: draft?.totals?.currency || 'INR',
+    itemCount: Number(draft?.totals?.itemCount ?? 0),
+  },
+});
 
 export default function Payment() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { removeItem } = useCart();
   const { isAuthenticated, getAuthToken, refreshCustomer } = useAuth();
+  const handledReturnRef = useRef(false);
 
   const [draft, setDraft] = useState(null);
-  const [selectedPayment, setSelectedPayment] = useState('COD');
+  const [selectedPayment, setSelectedPayment] = useState('UPI');
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [checkingReturn, setCheckingReturn] = useState(false);
   const [error, setError] = useState('');
   const [discountCodeInput, setDiscountCodeInput] = useState('');
   const [discountMessage, setDiscountMessage] = useState('');
   const [discountLoading, setDiscountLoading] = useState(false);
+  const [fastrrConfig, setFastrrConfig] = useState({
+    configured: false,
+    scriptUrl: SHIPROCKET_SCRIPT_URL,
+    styleUrl: SHIPROCKET_STYLE_URL,
+  });
+
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
+  const shiprocketOrderId = String(
+    searchParams.get('oid') || searchParams.get('orderId') || '',
+  ).trim();
+  const shiprocketStatus = String(searchParams.get('ost') || '').trim().toUpperCase();
+  const isShiprocketReturn = Boolean(searchParams.get('shiprocket') || shiprocketOrderId);
+
+  useEffect(() => {
+    let active = true;
+
+    fetchFastrrConfig()
+      .then((config) => {
+        if (!active || !config) return;
+        setFastrrConfig({
+          configured: Boolean(config.configured),
+          scriptUrl: config.scriptUrl || SHIPROCKET_SCRIPT_URL,
+          styleUrl: config.styleUrl || SHIPROCKET_STYLE_URL,
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setFastrrConfig((prev) => ({
+          ...prev,
+          configured: false,
+        }));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const currentDraft = getCheckoutDraft();
+
     if (!currentDraft?.items?.length) {
+      if (isShiprocketReturn) {
+        setDraft(
+          buildSafeDraft({
+            items: [],
+            shipping: {},
+            totals: { subtotal: 0, total: 0, currency: 'INR', itemCount: 0 },
+          }),
+        );
+        return;
+      }
+
       navigate('/cart', { replace: true });
       return;
     }
-    if (!currentDraft?.shipping) {
+
+    if (!currentDraft?.shipping && !isShiprocketReturn) {
       navigate('/checkout/address', { replace: true });
       return;
     }
 
-    const normalizedDraft = {
-      ...currentDraft,
-      totals: {
-        ...currentDraft.totals,
-        shippingFee: 0,
-        total: Math.max(
-          Number(currentDraft?.totals?.subtotal ?? 0) +
-            Number(currentDraft?.totals?.paymentFee ?? 0) -
-            Number(
-              currentDraft?.appliedDiscount?.amount ??
-                currentDraft?.totals?.discountAmount ??
-                0,
-            ),
-          0,
-        ),
-      },
-    };
+    const normalizedDraft = buildSafeDraft(currentDraft);
     setDraft(normalizedDraft);
     setCheckoutDraft(normalizedDraft);
-    setSelectedPayment(currentDraft.paymentMethod || 'COD');
-    setDiscountCodeInput(currentDraft?.appliedDiscount?.code || currentDraft?.totals?.discountCode || '');
+    setSelectedPayment(currentDraft.paymentMethod || 'UPI');
+    setDiscountCodeInput(
+      currentDraft?.appliedDiscount?.code || currentDraft?.totals?.discountCode || '',
+    );
     setDiscountMessage('');
-  }, [navigate]);
+  }, [isShiprocketReturn, navigate]);
 
   useEffect(() => {
     setDraft((prev) => {
       if (!prev) return prev;
-      const currentSubtotal = Number(prev?.totals?.subtotal ?? 0);
-      const currentShippingFee = 0;
-      const nextPaymentFee = Number(getPaymentMethodMeta(selectedPayment)?.fee || 0);
+
       const activeDiscount = prev.appliedDiscount || null;
-      const activeDiscountAmount = Number(
+      const nextDiscountAmount = Number(
         activeDiscount?.amount ?? prev?.totals?.discountAmount ?? 0,
-      );
-      const nextTotal = Math.max(
-        currentSubtotal + currentShippingFee + nextPaymentFee - activeDiscountAmount,
-        0,
       );
       const nextDraft = {
         ...prev,
@@ -186,10 +267,10 @@ export default function Payment() {
         totals: {
           ...prev.totals,
           shippingFee: 0,
-          paymentFee: nextPaymentFee,
-          discountAmount: activeDiscountAmount,
+          paymentFee: 0,
+          discountAmount: nextDiscountAmount,
           discountCode: activeDiscount?.code || prev?.totals?.discountCode || null,
-          total: nextTotal,
+          total: Math.max(Number(prev?.totals?.subtotal ?? 0) - nextDiscountAmount, 0),
         },
         updatedAt: new Date().toISOString(),
       };
@@ -197,6 +278,76 @@ export default function Payment() {
       return nextDraft;
     });
   }, [selectedPayment]);
+
+  useEffect(() => {
+    if (!shiprocketOrderId || handledReturnRef.current) return;
+    handledReturnRef.current = true;
+
+    const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
+    if (!token) {
+      setError('Please log in again to confirm your Shiprocket order.');
+      return;
+    }
+
+    const finalizeReturn = async () => {
+      setCheckingReturn(true);
+      setError('');
+
+      if (shiprocketStatus === 'FAILED') {
+        setCheckingReturn(false);
+        setError('Shiprocket checkout was not completed. Your cart is still available.');
+        return;
+      }
+
+      try {
+        const order = await withTimeout(
+          fetchFastrrCheckoutStatus(token, {
+            orderId: shiprocketOrderId,
+            refresh: '1',
+          }),
+          REQUEST_TIMEOUT_MS,
+          'Order confirmation timed out. Please refresh My Orders in a moment.',
+        );
+
+        const checkoutItems = Array.isArray(draft?.items) ? draft.items : [];
+        checkoutItems.forEach((item) => {
+          removeItem(item.slug, item.size ?? null);
+        });
+        clearCheckoutDraft();
+
+        if (typeof refreshCustomer === 'function') {
+          await refreshCustomer();
+        }
+
+        navigate(`/orders/${order?.id || order?.number}`, {
+          replace: true,
+          state: {
+            justPlaced: true,
+            orderNumber: order?.number || null,
+            order,
+          },
+        });
+      } catch (err) {
+        const message =
+          err?.message ||
+          'We could not confirm the Shiprocket order yet. Please check My Orders in a moment.';
+        setError(message);
+      } finally {
+        await sleep(150);
+        setCheckingReturn(false);
+      }
+    };
+
+    finalizeReturn();
+  }, [
+    draft?.items,
+    getAuthToken,
+    navigate,
+    refreshCustomer,
+    removeItem,
+    shiprocketOrderId,
+    shiprocketStatus,
+  ]);
 
   const itemCount = useMemo(
     () => (draft?.items || []).reduce((sum, item) => sum + Number(item?.quantity || 0), 0),
@@ -206,24 +357,22 @@ export default function Payment() {
   const currency = draft?.totals?.currency || 'INR';
   const subtotal = Number(draft?.totals?.subtotal ?? 0);
   const shippingFee = 0;
+  const paymentFee = 0;
   const selectedMethodMeta = getPaymentMethodMeta(selectedPayment);
-  const paymentFee = Number(selectedMethodMeta?.fee || 0);
   const appliedDiscount = draft?.appliedDiscount || null;
   const discountAmount = Number(appliedDiscount?.amount ?? draft?.totals?.discountAmount ?? 0);
   const finalTotal = Math.max(subtotal + shippingFee + paymentFee - discountAmount, 0);
-  const codAdvanceAmount = selectedPayment === 'COD' ? Math.min(50, finalTotal) : 0;
-  const payableNow = selectedPayment === 'COD' ? codAdvanceAmount : finalTotal;
-  const dueOnDelivery = selectedPayment === 'COD' ? Math.max(finalTotal - codAdvanceAmount, 0) : 0;
 
   const orderItems = useMemo(
     () =>
       (draft?.items || []).map((item) => ({
-        id: item.id || undefined,
+        id: String(item.id || '').trim(),
         sku: item.sku || undefined,
         name: item.name || item.slug || 'Product',
         price: Number(item.price || 0),
         currency: item.currency || currency,
         quantity: Number(item.quantity || 1),
+        size: item.size || undefined,
       })),
     [currency, draft?.items],
   );
@@ -243,18 +392,16 @@ export default function Payment() {
         : null;
 
     const nextDiscountAmount = Number(normalizedDiscount?.amount || 0);
-    const nextTotal = Math.max(subtotal + shippingFee + paymentFee - nextDiscountAmount, 0);
-
     const nextDraft = {
       ...draft,
       appliedDiscount: normalizedDiscount,
       totals: {
         ...draft.totals,
         shippingFee: 0,
-        paymentFee,
+        paymentFee: 0,
         discountAmount: nextDiscountAmount,
         discountCode: normalizedDiscount?.code || null,
-        total: nextTotal,
+        total: Math.max(subtotal - nextDiscountAmount, 0),
       },
       updatedAt: new Date().toISOString(),
     };
@@ -306,8 +453,10 @@ export default function Payment() {
     setDiscountMessage('Discount removed.');
   };
 
-  const handlePlaceOrder = async () => {
-    if (!draft?.items?.length || placingOrder) {
+  const handlePlaceOrder = async (event) => {
+    const checkoutEvent = event?.nativeEvent || event || null;
+
+    if (!draft?.items?.length || placingOrder || checkingReturn) {
       setError('Please select items to checkout.');
       return;
     }
@@ -325,7 +474,6 @@ export default function Payment() {
       return;
     }
 
-    // Validate order data
     if (!draft.shipping?.fullName || !draft.shipping?.address) {
       setError('Shipping address is incomplete. Please go back and complete your address.');
       return;
@@ -339,145 +487,44 @@ export default function Payment() {
     try {
       setPlacingOrder(true);
       const payload = {
-        paymentMethod: selectedPayment,
-        totals: {
-          subtotal,
-          shippingFee: 0,
-          paymentFee,
-          discountAmount,
-          discountCode: appliedDiscount?.code || null,
-          total: finalTotal,
-          currency,
+        order: {
+          paymentMethod: selectedPayment,
+          totals: {
+            subtotal,
+            shippingFee: 0,
+            paymentFee: 0,
+            discountAmount,
+            discountCode: appliedDiscount?.code || null,
+            total: finalTotal,
+            currency,
+          },
+          shipping: draft.shipping,
+          items: orderItems,
         },
-        shipping: draft.shipping,
-        items: orderItems,
-        discount: appliedDiscount?.code
-          ? {
-              id: appliedDiscount.id || undefined,
-              code: appliedDiscount.code,
-            }
-          : undefined,
       };
 
-      const scriptReady = await loadRazorpayScript();
-      if (!scriptReady || !window.Razorpay) {
-        throw new Error('Unable to load Razorpay checkout. Please try again.');
-      }
-
-      const razorpayOrderPayload = await withTimeout(
-        createRazorpayOrder(token, {
-          order: payload,
-          receipt: `rcpt_${Date.now()}`,
-          notes: {
-            customerEmail: draft?.shipping?.email || '',
-            customerPhone: draft?.shipping?.phone || '',
-            discountCode: appliedDiscount?.code || '',
-          },
-        }),
-        PAYMENT_REQUEST_TIMEOUT_MS,
-        'Unable to create payment request right now. Please try again.',
+      const session = await withTimeout(
+        createFastrrCheckoutSession(token, payload),
+        REQUEST_TIMEOUT_MS,
+        'Unable to create Shiprocket checkout right now. Please try again.',
       );
 
-      const createdOrder = await withTimeout(
-        new Promise((resolve, reject) => {
-          const options = {
-            key: razorpayOrderPayload?.keyId,
-            amount: razorpayOrderPayload?.order?.amount,
-            currency: razorpayOrderPayload?.order?.currency || currency,
-            name: 'Aradhya',
-            description:
-              selectedPayment === 'COD'
-                ? 'COD booking advance payment'
-                : `Order payment (${selectedPayment})`,
-            order_id: razorpayOrderPayload?.order?.id,
-            prefill: {
-              name: draft?.shipping?.fullName || '',
-              email: draft?.shipping?.email || '',
-              contact: draft?.shipping?.phone || '',
-            },
-            notes: {
-              checkoutMethod: selectedPayment,
-              payableNow: String(payableNow),
-              dueOnDelivery: String(dueOnDelivery),
-            },
-            theme: {
-              color: '#000000',
-            },
-            modal: {
-              ondismiss: () => reject(new Error('Payment cancelled.')),
-            },
-            handler: async (response) => {
-              try {
-                const confirmedOrder = await withTimeout(
-                  confirmRazorpayCheckout(token, {
-                    payment: {
-                      razorpayOrderId: response?.razorpay_order_id,
-                      razorpayPaymentId: response?.razorpay_payment_id,
-                      razorpaySignature: response?.razorpay_signature,
-                    },
-                    order: payload,
-                  }),
-                  PAYMENT_REQUEST_TIMEOUT_MS,
-                  'Payment was captured but order confirmation timed out. Please check My Orders.',
-                );
-                resolve(confirmedOrder);
-              } catch (verificationErr) {
-                reject(verificationErr);
-              }
-            },
-          };
-
-          const razorpay = new window.Razorpay(options);
-          razorpay.on('payment.failed', (event) => {
-            const reason =
-              event?.error?.description ||
-              event?.error?.reason ||
-              event?.error?.code ||
-              'Payment failed.';
-            reject(new Error(reason));
-          });
-          razorpay.open();
-        }),
-        PAYMENT_MODAL_TIMEOUT_MS,
-        'Payment window did not open in time. Please try again.',
+      const assetsLoaded = await loadShiprocketAssets(
+        session?.scriptUrl || fastrrConfig.scriptUrl,
+        session?.styleUrl || fastrrConfig.styleUrl,
       );
-
-      (draft.items || []).forEach((item) => {
-        removeItem(item.slug, item.size ?? null);
-      });
-      clearCheckoutDraft();
-
-      if (typeof refreshCustomer === 'function') {
-        await refreshCustomer();
+      if (!assetsLoaded || !window.HeadlessCheckout?.addToCart) {
+        throw new Error('Shiprocket checkout could not be loaded. Please try again.');
       }
 
-      navigate(`/orders/${createdOrder?.id || createdOrder?.number}`, {
-        replace: true,
-        state: {
-          justPlaced: true,
-          orderNumber: createdOrder?.number || null,
-          order: createdOrder,
-        },
-      });
+      window.HeadlessCheckout.addToCart(checkoutEvent, session.token);
+      setDiscountMessage('Opening secure Shiprocket checkout...');
     } catch (err) {
-      console.error('Order placement error:', err);
-      const errorMessage =
+      const message =
         err?.message ||
         err?.payload?.error?.message ||
-        'Unable to place order right now. Please try again or contact support.';
-      
-      if (err?.status === 401 || err?.status === 403) {
-        setError('Session expired. Please log in again.');
-        setTimeout(() => {
-          navigate('/login?redirect=/checkout/payment');
-        }, 2000);
-      } else if (err?.status === 400) {
-        setError('Invalid order data. Please refresh and try again.');
-      } else if (err?.status === 500) {
-        setError('Server error. Please try again in a moment.');
-      } else {
-        setError(errorMessage);
-      }
+        'Unable to continue to Shiprocket checkout right now.';
+      setError(message);
     } finally {
       setPlacingOrder(false);
     }
@@ -490,10 +537,16 @@ export default function Payment() {
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => navigate(-1)} className="rounded p-1 text-gray-700 hover:bg-gray-100">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="rounded p-1 text-gray-700 hover:bg-gray-100"
+            >
               <ArrowLeft className="h-6 w-6" />
             </button>
-            <h1 className="text-lg font-bold tracking-wide text-[var(--color-text-main)]">PAYMENT</h1>
+            <h1 className="text-lg font-bold tracking-wide text-[var(--color-text-main)]">
+              PAYMENT
+            </h1>
           </div>
           <span className="text-xs font-semibold text-gray-500">STEP 3/3</span>
         </div>
@@ -501,7 +554,9 @@ export default function Payment() {
 
       <div className="mx-auto w-full max-w-5xl space-y-4 px-4 py-4">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="mb-3 text-sm font-semibold text-[var(--color-text-main)]">Deliver to</p>
+          <p className="mb-3 text-sm font-semibold text-[var(--color-text-main)]">
+            Deliver to
+          </p>
           <p className="text-sm font-semibold text-gray-900">{draft.shipping?.fullName}</p>
           <p className="text-sm text-gray-600">{draft.shipping?.address}</p>
           <p className="text-sm text-gray-600">
@@ -519,7 +574,9 @@ export default function Payment() {
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
             <BadgePercent className="h-4 w-4 text-gray-700" />
-            <p className="text-sm font-semibold text-[var(--color-text-main)]">Apply Discount Code</p>
+            <p className="text-sm font-semibold text-[var(--color-text-main)]">
+              Apply Discount Code
+            </p>
           </div>
           <div className="flex gap-2">
             <input
@@ -566,7 +623,9 @@ export default function Payment() {
 
         <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-100 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Select payment method</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">
+              Preferred payment method
+            </p>
           </div>
           <div className="divide-y divide-gray-100">
             {PAYMENT_METHODS.map((method) => {
@@ -595,16 +654,7 @@ export default function Payment() {
                   </span>
                   <Icon className="mt-0.5 h-4 w-4 text-gray-600" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-gray-900">{method.label}</p>
-                      {method.fee > 0 ? (
-                        <span className="text-xs font-semibold text-gray-700">
-                          +{formatMoney(method.fee, currency)}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-semibold text-emerald-600">No extra fee</span>
-                      )}
-                    </div>
+                    <p className="text-sm font-semibold text-gray-900">{method.label}</p>
                     <p className="text-xs text-gray-500">{method.description}</p>
                   </div>
                 </button>
@@ -613,8 +663,29 @@ export default function Payment() {
           </div>
         </section>
 
+        <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 text-blue-700" />
+            <div>
+              <p className="text-sm font-semibold text-blue-900">
+                Secure checkout by Shiprocket
+              </p>
+              <p className="mt-1 text-sm text-blue-800">
+                Your cart will open inside Shiprocket&apos;s hosted checkout. Shipping,
+                payment, and final confirmation happen there, and then you&apos;ll be brought
+                back to Aradhya automatically.
+              </p>
+              <p className="mt-2 text-xs text-blue-700">
+                Preference saved: {selectedMethodMeta.label}
+              </p>
+            </div>
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="mb-3 text-sm font-semibold text-[var(--color-text-main)]">Order Summary</p>
+          <p className="mb-3 text-sm font-semibold text-[var(--color-text-main)]">
+            Order Summary
+          </p>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-gray-700">
               <span>Subtotal ({itemCount} items)</span>
@@ -623,10 +694,6 @@ export default function Payment() {
             <div className="flex justify-between text-gray-700">
               <span>Delivery</span>
               <span className="font-semibold text-emerald-600">Free</span>
-            </div>
-            <div className="flex justify-between text-gray-700">
-              <span>{selectedMethodMeta.label} fee</span>
-              <span>{paymentFee > 0 ? formatMoney(paymentFee, currency) : formatMoney(0, currency)}</span>
             </div>
             {discountAmount > 0 ? (
               <div className="flex justify-between text-emerald-700">
@@ -643,67 +710,68 @@ export default function Payment() {
                 <span>{formatMoney(finalTotal, currency)}</span>
               </div>
             </div>
-            {selectedPayment === 'COD' ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-                <div className="flex justify-between text-sm text-amber-900">
-                  <span>Pay now to book order</span>
-                  <span className="font-bold">{formatMoney(payableNow, currency)}</span>
-                </div>
-                <div className="mt-2 flex justify-between text-sm text-amber-900">
-                  <span>Pay on delivery</span>
-                  <span className="font-bold">{formatMoney(dueOnDelivery, currency)}</span>
-                </div>
-                <p className="mt-2 text-xs text-amber-800">
-                  Example: on a Rs 700 order, customer pays Rs 50 now and Rs 650 at delivery.
-                </p>
-              </div>
-            ) : null}
           </div>
         </section>
 
         {!isAuthenticated ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <span className="font-bold">!</span>
             <div>
               <p className="font-semibold">Login Required</p>
-              <p className="text-xs mt-1">Please login to place this order.</p>
+              <p className="mt-1 text-xs">Please login to continue to checkout.</p>
             </div>
+          </div>
+        ) : null}
+
+        {!fastrrConfig.configured && !checkingReturn ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Shiprocket checkout isn&apos;t configured on the server yet. Add the Fastrr API
+            key and secret, then try again.
+          </div>
+        ) : null}
+
+        {checkingReturn ? (
+          <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <span>
+              Confirming your Shiprocket order
+              {shiprocketOrderId ? ` (${shiprocketOrderId})` : ''}...
+            </span>
           </div>
         ) : null}
 
         {error ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-2">
+          <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             <span className="font-bold">x</span>
             <div className="flex-1">
               <p className="font-semibold">Error</p>
-              <p className="text-xs mt-1">{error}</p>
+              <p className="mt-1 text-xs">{error}</p>
             </div>
           </div>
         ) : null}
 
-        {placingOrder && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span>Processing your order...</span>
+        {placingOrder ? (
+          <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <span>Preparing Shiprocket checkout...</span>
           </div>
-        )}
+        ) : null}
       </div>
 
-      <div className="fixed bottom-[60px] md:bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 py-3 shadow-[0_-4px_10px_rgba(0,0,0,0.04)]">
+      <div className="fixed bottom-[60px] left-0 right-0 z-30 border-t border-gray-200 bg-white px-4 py-3 shadow-[0_-4px_10px_rgba(0,0,0,0.04)] md:bottom-0">
         <button
           type="button"
           onClick={handlePlaceOrder}
-          disabled={placingOrder}
+          disabled={placingOrder || checkingReturn || !fastrrConfig.configured}
           className="w-full rounded-sm bg-black py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-gray-900 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
         >
           {placingOrder
-            ? 'Placing Order...'
-            : selectedPayment === 'COD'
-              ? `Pay ${formatMoney(payableNow, currency)} & Book COD Order`
-              : `Place Order - ${formatMoney(finalTotal, currency)}`}
+            ? 'Opening Checkout...'
+            : checkingReturn
+              ? 'Confirming Order...'
+              : `Continue to Shiprocket Checkout - ${formatMoney(finalTotal, currency)}`}
         </button>
       </div>
     </div>
   );
 }
-

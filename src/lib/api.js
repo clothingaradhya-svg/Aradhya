@@ -844,6 +844,24 @@ export const confirmRazorpayCheckout = async (token, data) =>
     }),
   );
 
+export const fetchFastrrConfig = async () =>
+  unwrap(await request('/fastrr/config'));
+
+export const createFastrrCheckoutSession = async (token, data) =>
+  unwrap(
+    await requestWithAuth('/fastrr/checkout-session', token, {
+      method: 'POST',
+      body: data,
+    }),
+  );
+
+export const fetchFastrrCheckoutStatus = async (token, params = {}) =>
+  unwrap(
+    await requestWithAuth(`/fastrr/checkout-status${buildQuery(params)}`, token, {
+      method: 'GET',
+    }),
+  );
+
 export const verifyDiscountCode = async ({ code, subtotal, currency }) =>
   unwrap(
     await request('/discounts/verify', {

@@ -24,6 +24,7 @@ const uploadRoutes = require('./src/routes/upload.routes');
 const reviewRoutes = require('./src/routes/review.routes');
 const orderRoutes = require('./src/routes/order.routes');
 const shiprocketRoutes = require('./src/routes/shiprocket.routes');
+const fastrrRoutes = require('./src/routes/fastrr.routes');
 const discountRoutes = require('./src/routes/discount.routes');
 
 const app = express();
@@ -115,6 +116,7 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/shiprocket', shiprocketRoutes);
+app.use('/api/fastrr', fastrrRoutes);
 app.use('/api/discounts', discountRoutes);
 
 app.use((err, req, res, next) => {
