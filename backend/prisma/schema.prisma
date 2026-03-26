@@ -125,6 +125,7 @@ model ProductOption {
 
 model ProductVariant {
   id                   String          @id @default(cuid())
+  externalNumericId    BigInt          @default(autoincrement()) @unique
   productId            String
   title                String
   position             Int?

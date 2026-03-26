@@ -20,8 +20,18 @@ const shippingSchema = z
   })
   .passthrough();
 
+const numericVariantIdSchema = z
+  .union([
+    z.number().int().positive(),
+    z.string().trim().regex(/^\d+$/, "Variant ID must be provided as a numerical value."),
+  ])
+  .transform((value) => String(value).trim());
+
 const orderItemSchema = z.object({
-  id: z.string().trim().min(1),
+  id: z
+    .union([z.string(), z.number()])
+    .transform((value) => String(value ?? "").trim())
+    .refine(Boolean, "Variant ID is required."),
   sku: z.string().trim().optional().nullable(),
   name: z.string().trim().min(1),
   price: z.number().nonnegative(),
@@ -69,7 +79,7 @@ const orderWebhookSchema = z.object({
       items: z
         .array(
           z.object({
-            variant_id: z.string().trim().min(1),
+            variant_id: numericVariantIdSchema,
             quantity: z.number().int().min(1),
           }),
         )
@@ -168,6 +178,107 @@ const getRedirectUrl = (req, payload) => {
   return parsed.toString();
 };
 
+const normalizeExternalVariantId = (value) => {
+  const normalized = String(value ?? "").trim();
+  return /^\d+$/.test(normalized) ? normalized : "";
+};
+
+const toExternalVariantBigInt = (value) => {
+  const normalized = normalizeExternalVariantId(value);
+  return normalized ? BigInt(normalized) : null;
+};
+
+const toExternalVariantNumber = (value, context = "Variant ID") => {
+  const normalized = normalizeExternalVariantId(
+    typeof value === "bigint" ? value.toString() : value,
+  );
+  if (!normalized) {
+    const error = new Error(`${context} must be provided as a numerical value.`);
+    error.status = 400;
+    throw error;
+  }
+
+  const numericValue = Number(normalized);
+  if (!Number.isSafeInteger(numericValue) || numericValue <= 0) {
+    const error = new Error(`${context} must be a safe positive integer.`);
+    error.status = 500;
+    throw error;
+  }
+
+  return numericValue;
+};
+
+const resolveCheckoutItemsForFastrr = async (prisma, items = []) => {
+  const requestedItems = Array.isArray(items) ? items : [];
+  if (!requestedItems.length) return [];
+
+  const internalVariantIds = [];
+  const externalVariantIds = [];
+
+  requestedItems.forEach((item) => {
+    const rawId = String(item?.id ?? "").trim();
+    if (!rawId) return;
+
+    const externalVariantId = toExternalVariantBigInt(rawId);
+    if (externalVariantId !== null) {
+      externalVariantIds.push(externalVariantId);
+      return;
+    }
+
+    internalVariantIds.push(rawId);
+  });
+
+  const variantLookupFilters = [];
+  if (internalVariantIds.length) {
+    variantLookupFilters.push({ id: { in: internalVariantIds } });
+  }
+  if (externalVariantIds.length) {
+    variantLookupFilters.push({ externalNumericId: { in: externalVariantIds } });
+  }
+
+  const variants = variantLookupFilters.length
+    ? await prisma.productVariant.findMany({
+        where: {
+          OR: variantLookupFilters,
+        },
+        select: {
+          id: true,
+          externalNumericId: true,
+        },
+      })
+    : [];
+
+  const variantsByInternalId = new Map(variants.map((variant) => [variant.id, variant]));
+  const variantsByExternalId = new Map(
+    variants.map((variant) => [variant.externalNumericId.toString(), variant]),
+  );
+
+  return requestedItems.map((item, index) => {
+    const rawId = String(item?.id ?? "").trim();
+    const normalizedExternalVariantId = normalizeExternalVariantId(rawId);
+    const variant =
+      variantsByInternalId.get(rawId) ||
+      (normalizedExternalVariantId
+        ? variantsByExternalId.get(normalizedExternalVariantId)
+        : null);
+
+    if (!variant) {
+      const error = new Error(`Unable to resolve Variant ID for item ${index + 1}.`);
+      error.status = 400;
+      throw error;
+    }
+
+    return {
+      ...item,
+      id: variant.id,
+      externalVariantId: toExternalVariantNumber(
+        variant.externalNumericId,
+        `Variant ID for item ${index + 1}`,
+      ),
+    };
+  });
+};
+
 const buildFastrrProductPayload = (product) => {
   const productImage = product?.media?.[0]?.url || null;
 
@@ -183,7 +294,10 @@ const buildFastrrProductPayload = (product) => {
     tags: Array.isArray(product.tags) ? product.tags.join(", ") : "",
     status: String(product.status || "DRAFT").toLowerCase(),
     variants: (Array.isArray(product.variants) ? product.variants : []).map((variant) => ({
-      id: variant.id,
+      id: toExternalVariantNumber(
+        variant.externalNumericId,
+        `Variant ID for ${variant.title || product.title || "product variant"}`,
+      ),
       title: variant.title || product.title,
       price: String(toMoney(variant.price, 0).toFixed(2)),
       sku: variant.sku || "",
@@ -264,27 +378,30 @@ const hydrateItemsFromCartData = async (prisma, cartDataItems = [], existingItem
 
   const requestedItems = Array.isArray(cartDataItems) ? cartDataItems : [];
   const variantIds = requestedItems
-    .map((item) => String(item?.variant_id || "").trim())
+    .map((item) => normalizeExternalVariantId(item?.variant_id))
     .filter(Boolean);
 
   if (!variantIds.length) return [];
 
   const variants = await prisma.productVariant.findMany({
-    where: { id: { in: variantIds } },
+    where: { externalNumericId: { in: variantIds.map((variantId) => BigInt(variantId)) } },
     include: {
       product: {
         select: { id: true, title: true, vendor: true },
       },
     },
   });
-  const variantMap = new Map(variants.map((variant) => [variant.id, variant]));
+  const variantMap = new Map(
+    variants.map((variant) => [variant.externalNumericId.toString(), variant]),
+  );
 
   return requestedItems.map((entry, index) => {
-    const variantId = String(entry?.variant_id || "").trim();
+    const variantId = normalizeExternalVariantId(entry?.variant_id);
     const variant = variantMap.get(variantId);
     const quantity = Math.max(1, Number(entry?.quantity || 1));
     return {
-      id: variantId || `line-${index + 1}`,
+      id: variant?.id || `line-${index + 1}`,
+      externalVariantId: variantId || null,
       sku: variant?.sku || null,
       name: variant?.product?.title || variant?.title || `Item ${index + 1}`,
       price: toMoney(variant?.price, 0),
@@ -490,6 +607,7 @@ exports.listCatalogProducts = async (req, res, next) => {
             orderBy: { position: "asc" },
             select: {
               id: true,
+              externalNumericId: true,
               title: true,
               price: true,
               sku: true,
@@ -562,6 +680,7 @@ exports.listCollectionProducts = async (req, res, next) => {
             orderBy: { position: "asc" },
             select: {
               id: true,
+              externalNumericId: true,
               title: true,
               price: true,
               sku: true,
@@ -637,11 +756,12 @@ exports.createCheckoutSession = async (req, res, next) => {
 
     const payload = createCheckoutSessionSchema.parse(req.body || {});
     const prisma = await getPrisma();
+    const resolvedItems = await resolveCheckoutItemsForFastrr(prisma, payload.order.items);
     const redirectUrl = getRedirectUrl(req, payload);
     const fastrrPayload = {
       cart_data: {
-        items: payload.order.items.map((item) => ({
-          variant_id: String(item.id),
+        items: resolvedItems.map((item) => ({
+          variant_id: item.externalVariantId,
           quantity: Number(item.quantity || 1),
         })),
       },
@@ -689,7 +809,7 @@ exports.createCheckoutSession = async (req, res, next) => {
             paymentMethod: "SHIPROCKET_FASTRR",
             totals: normalizedTotals,
             shipping: normalizedShipping,
-            items: payload.order.items,
+            items: resolvedItems,
           },
         })
       : await prisma.order.create({
@@ -700,7 +820,7 @@ exports.createCheckoutSession = async (req, res, next) => {
             paymentMethod: "SHIPROCKET_FASTRR",
             totals: normalizedTotals,
             shipping: normalizedShipping,
-            items: payload.order.items,
+            items: resolvedItems,
           },
         });
 
