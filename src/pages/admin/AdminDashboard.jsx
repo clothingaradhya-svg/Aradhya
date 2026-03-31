@@ -9,6 +9,8 @@ import {
   TrendingUp, Activity, Plus, Star
 } from 'lucide-react';
 
+const Motion = motion;
+
 const formatDateTime = (value) => {
   if (!value) return '-';
   const date = new Date(value);
@@ -265,7 +267,7 @@ const AdminDashboard = () => {
                       <div className="flex items-center gap-3 mb-1.5">
                         <p className="font-bold text-slate-100">{order.number || order.id}</p>
                         <span
-                          className={`px - 2.5 py - 1 rounded - md text - [10px] font - bold tracking - wider uppercase border ${statusBadge(order.status)} `}
+                          className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border ${statusBadge(order.status)}`}
                         >
                           {order.status}
                         </span>

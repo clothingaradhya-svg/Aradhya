@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   adminDeleteCollection,
@@ -9,13 +9,15 @@ import { motion } from 'framer-motion';
 import { Layers, Plus, Edit, Trash2, FolderTree, Package } from 'lucide-react';
 import { useAdminToast } from '../../components/admin/AdminToaster';
 
+const Motion = motion;
+
 const AdminCollections = () => {
   const { token } = useAdminAuth();
   const toast = useAdminToast();
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadCollections = async () => {
+  const loadCollections = useCallback(async () => {
     if (!token) {
       toast.error('Authentication Required', 'Please log in again.');
       setLoading(false);
@@ -35,12 +37,12 @@ const AdminCollections = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast, token]);
 
   useEffect(() => {
     if (!token) return;
     loadCollections();
-  }, [token, toast]);
+  }, [loadCollections, token]);
 
   const handleDelete = async (id) => {
     if (!id) return;

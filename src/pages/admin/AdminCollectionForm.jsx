@@ -12,6 +12,8 @@ import { useAdminToast } from '../../components/admin/AdminToaster';
 import { motion } from 'framer-motion';
 import { FolderTree, Package, Image as ImageIcon, Sparkles, Settings2, Save, X, Search } from 'lucide-react';
 
+const Motion = motion;
+
 const slugify = (value) =>
   value
     .toString()

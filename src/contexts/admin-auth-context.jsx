@@ -44,7 +44,7 @@ export function AdminProvider({ children }) {
         setAdmin(profile);
         setToken(stored);
       }
-    } catch (err) {
+    } catch {
       clearToken();
       setAdmin(null);
     } finally {

@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { Users as UsersIcon, Search, Shield, User, Store, ChevronDown } from 'lucide-react';
 import { useAdminToast } from '../../components/admin/AdminToaster';
 
+const Motion = motion;
+
 const formatDateTime = (value) => {
   if (!value) return '-';
   const date = new Date(value);

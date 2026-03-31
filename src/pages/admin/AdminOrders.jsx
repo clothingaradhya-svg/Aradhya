@@ -5,10 +5,11 @@ import { useAdminToast } from '../../components/admin/AdminToaster';
 import { motion } from 'framer-motion';
 import {
   Search, Filter, ChevronDown, CheckCircle,
-  Clock, XCircle, ShoppingBag, Truck, Package
+  Clock, XCircle, ShoppingBag, Package
 } from 'lucide-react';
 
 const ORDER_STEPS = ['PENDING', 'PAID', 'FULFILLED'];
+const Motion = motion;
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -30,15 +31,6 @@ const statusBadge = (status) => {
   if (token === 'PENDING') return 'bg-amber-500/10 border-amber-500/20 text-amber-400 font-bold';
   if (token === 'CANCELLED') return 'bg-rose-500/10 border-rose-500/20 text-rose-400 font-bold';
   return 'bg-slate-800/50 border-slate-700/50 text-slate-300 font-bold';
-};
-
-const toLabel = (status) => {
-  const token = String(status || '').toUpperCase();
-  if (token === 'FULFILLED') return 'Delivered';
-  if (token === 'PAID') return 'Paid';
-  if (token === 'PENDING') return 'Pending';
-  if (token === 'CANCELLED') return 'Cancelled';
-  return token || 'Unknown';
 };
 
 const trackingSteps = (order) => {

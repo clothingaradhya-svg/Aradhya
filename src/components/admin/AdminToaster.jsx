@@ -1,8 +1,10 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, AlertCircle, Info, X } from 'lucide-react';
 
 const AdminToastContext = createContext(null);
+const MotionDiv = motion.div;
 
 export const useAdminToast = () => {
     const context = useContext(AdminToastContext);
@@ -60,7 +62,7 @@ export const AdminToastProvider = ({ children }) => {
                         }
 
                         return (
-                            <motion.div
+                            <MotionDiv
                                 key={toast.id}
                                 initial={{ opacity: 0, y: -20, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -80,7 +82,7 @@ export const AdminToastProvider = ({ children }) => {
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
-                            </motion.div>
+                            </MotionDiv>
                         );
                     })}
                 </AnimatePresence>

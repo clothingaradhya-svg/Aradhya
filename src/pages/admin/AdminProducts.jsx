@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   adminDeleteProduct,
@@ -12,8 +12,10 @@ import { useAdminToast } from '../../components/admin/AdminToaster';
 import { motion } from 'framer-motion';
 import {
   Search, PackageOpen, Download, Upload,
-  Trash2, Plus, Image as ImageIcon, Edit, CheckCircle, Tag
+  Trash2, Plus, Image as ImageIcon, Edit, Tag
 } from 'lucide-react';
+
+const Motion = motion;
 
 const AdminProducts = () => {
   const { token } = useAdminAuth();
@@ -21,6 +23,7 @@ const AdminProducts = () => {
   const [products, setProducts] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
@@ -28,36 +31,42 @@ const AdminProducts = () => {
   const [importSummary, setImportSummary] = useState(null);
   const [deleteSummary, setDeleteSummary] = useState(null);
 
-  const loadProducts = async (searchValue = '') => {
-    if (!token) {
-      toast.error('Authentication Required', 'Please log in again.');
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const payload = await adminFetchProducts(token, {
-        search: searchValue || undefined,
-        limit: 100,
-      });
-      const items = payload?.data ?? payload ?? [];
-      setProducts(items);
-    } catch (err) {
-      const errorMessage = err?.message || err?.payload?.error?.message || 'Unable to load products.';
-      if (err?.status === 401 || err?.status === 403) {
-        toast.error('Session Expired', 'Please log in again.');
-      } else {
-        toast.error('Load Failed', errorMessage);
+  const loadProducts = useCallback(
+    async (searchValue = '') => {
+      if (!token) {
+        toast.error('Authentication Required', 'Please log in again.');
+        setLoading(false);
+        return;
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+      setLoading(true);
+      setError('');
+      try {
+        const payload = await adminFetchProducts(token, {
+          search: searchValue || undefined,
+          limit: 100,
+        });
+        const items = payload?.data ?? payload ?? [];
+        setProducts(items);
+      } catch (err) {
+        const errorMessage =
+          err?.message || err?.payload?.error?.message || 'Unable to load products.';
+        setError(errorMessage);
+        if (err?.status === 401 || err?.status === 403) {
+          toast.error('Session Expired', 'Please log in again.');
+        } else {
+          toast.error('Load Failed', errorMessage);
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [toast, token],
+  );
 
   useEffect(() => {
     if (!token) return;
     loadProducts();
-  }, [token]);
+  }, [loadProducts, token]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -306,6 +315,12 @@ const AdminProducts = () => {
           </button>
         </form>
       </div>
+
+      {error ? (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          {error}
+        </div>
+      ) : null}
 
       {importSummary ? (
         <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-200">

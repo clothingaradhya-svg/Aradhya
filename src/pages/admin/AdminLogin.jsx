@@ -66,7 +66,7 @@ const AdminLogin = () => {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 className="w-full rounded-lg border border-slate-700 bg-slate-950 px-10 py-3 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                placeholder="••••••••"
+                placeholder="Password"
               />
             </div>
           </div>
@@ -76,7 +76,7 @@ const AdminLogin = () => {
             disabled={loading}
             className="w-full rounded-lg bg-emerald-400 text-slate-950 font-semibold py-3 text-sm uppercase tracking-[0.25em] hover:bg-emerald-300 transition disabled:opacity-60"
           >
-            {loading ? 'Signing in…' : 'Enter Studio'}
+            {loading ? 'Signing in...' : 'Enter Studio'}
           </button>
         </form>
 
