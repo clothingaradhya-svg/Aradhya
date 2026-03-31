@@ -142,7 +142,6 @@ const ProductDetails = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const relatedSignatureRef = useRef(null);
   const recommendedSignatureRef = useRef(null);
 
   const [images, setImages] = useState([]);
@@ -151,7 +150,6 @@ const ProductDetails = () => {
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
   const [openAccordion, setOpenAccordion] = useState('details');
-  const [pincode, setPincode] = useState('');
   const [selectedComboItems, setSelectedComboItems] = useState(new Set());
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
@@ -443,6 +441,7 @@ const ProductDetails = () => {
     Boolean(sizeChartData.imageUrl?.trim()) || Boolean(sizeChartData.text?.trim());
   const comboItems = useMemo(() => product?.comboItems ?? [], [product]);
   const hasComboItems = comboItems.length > 0;
+  const enableFrequentlyBoughtTogether = false;
   const isBundleLikeProduct = useMemo(() => {
     if (!product) return false;
     const hasBundleMetafield = Array.isArray(product.metafields)
@@ -664,12 +663,6 @@ const ProductDetails = () => {
       return;
     }
 
-    // If FBT items are selected, we MUST ask for their sizes first
-    if (selectedFbtItems.size > 0) {
-      setShowSizeModal(true);
-      return;
-    }
-
     // Otherwise, just add main product and go to cart
     addItem(product.handle, { size: primarySize, quantity: 1 });
     navigate('/cart');
@@ -699,16 +692,11 @@ const ProductDetails = () => {
         addItem(handle, { size, quantity: quantity ?? 1 });
       });
     } else {
-      // 1. Add Main Product
+      // Add the main product for single-product pages.
       addItem(product.handle, { size: primarySize, quantity: 1 });
-
-      // 2. Add FBT Items
-      itemsWithSizes.forEach(({ handle, size }) => {
-        addItem(handle, { size, quantity: 1 });
-      });
     }
 
-    // 3. Close & Redirect
+    // Close & redirect after cart updates.
     setShowSizeModal(false);
     navigate('/cart');
   };
@@ -724,9 +712,11 @@ const ProductDetails = () => {
     setSelectedComboItems(next);
   }, [comboItems, hasComboItems]);
 
-  // Fetch related products for "Frequently Bought Together"
-  // Fetch related products for "Frequently Bought Together"
   useEffect(() => {
+    if (!enableFrequentlyBoughtTogether) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     // Helper to check if product is a combo
@@ -780,14 +770,6 @@ const ProductDetails = () => {
         setRelatedProducts([]);
         return;
       }
-
-      const signature = [
-        product.handle,
-        product.productType ?? '',
-        Array.isArray(product.tags) ? product.tags.join(',') : '',
-      ].join('|');
-      if (relatedSignatureRef.current === signature) return;
-      relatedSignatureRef.current = signature;
 
       const currentCat = getCategory(product);
 
@@ -907,7 +889,7 @@ const ProductDetails = () => {
     return () => {
       cancelled = true;
     };
-  }, [product, hasComboItems, isBundleLikeProduct]);
+  }, [product, hasComboItems, isBundleLikeProduct, enableFrequentlyBoughtTogether]);
 
   // Fetch "You Might Also Like" products (Same Collection or Category)
   useEffect(() => {
@@ -1298,8 +1280,7 @@ const ProductDetails = () => {
               </div>
             ) : null}
 
-            {/* Frequently Bought Together Section (Moved Below Combo) */}
-            {relatedProducts.length > 0 && !hasComboItems && (
+            {enableFrequentlyBoughtTogether && relatedProducts.length > 0 && !hasComboItems && (
               <FrequentlyBoughtTogether
                 products={relatedProducts}
                 selectedHandles={selectedFbtItems}
@@ -1353,7 +1334,7 @@ const ProductDetails = () => {
               items={
                 hasComboItems
                   ? selectedComboList
-                  : relatedProducts.filter((p) => selectedFbtItems.has(p.handle))
+                  : []
               }
               onConfirm={handleConfirmSizes}
             />
