@@ -93,6 +93,25 @@ const RESERVED_CUSTOM_METAFIELD_KEYS = new Set([
   'homepage_best_seller_title',
 ]);
 
+const HOMEPAGE_SECTION_DEFS = [
+  {
+    id: 'featured',
+    adminLabel: 'Highlighted Products',
+    description: 'First homepage product row.',
+    enabledKey: 'homepage_featured',
+    orderKey: 'homepage_featured_order',
+    titleKey: 'homepage_featured_title',
+  },
+  {
+    id: 'bestSeller',
+    adminLabel: 'Best Seller Products',
+    description: 'Second homepage product row.',
+    enabledKey: 'homepage_best_seller',
+    orderKey: 'homepage_best_seller_order',
+    titleKey: 'homepage_best_seller_title',
+  },
+];
+
 const normalizeToken = (value) => String(value || '').trim().toLowerCase();
 
 const isCustomMetafield = (field, keys) => {
@@ -114,6 +133,26 @@ const readCustomMetafield = (fields, keys) => {
     return String(entry.value);
   }
 };
+
+const readHomepageBoolean = (fields, key) =>
+  ['true', '1', 'yes', 'y', 'on'].includes(normalizeToken(readCustomMetafield(fields, [key])));
+
+const readHomepageOrder = (fields, key) => {
+  const parsed = Number.parseInt(String(readCustomMetafield(fields, [key])).trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : '';
+};
+
+const createHomepageSectionsState = (fields = []) =>
+  Object.fromEntries(
+    HOMEPAGE_SECTION_DEFS.map((section) => [
+      section.id,
+      {
+        enabled: readHomepageBoolean(fields, section.enabledKey),
+        order: readHomepageOrder(fields, section.orderKey),
+        title: String(readCustomMetafield(fields, [section.titleKey])).trim(),
+      },
+    ]),
+  );
 
 const createUploadId = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -165,6 +204,7 @@ const AdminProductForm = () => {
     bundlePrice: '',
     sizeChartImageUrl: '',
     sizeChartText: '',
+    homepageSections: createHomepageSectionsState(),
   });
 
   const optionList = useMemo(() => buildOptionList(form.options), [form.options]);
@@ -185,6 +225,27 @@ const AdminProductForm = () => {
   const primaryVariant = useMemo(
     () => createVariantDraft(form.variants[0]),
     [form.variants],
+  );
+  const homepagePlacements = useMemo(
+    () =>
+      HOMEPAGE_SECTION_DEFS.map((section) => {
+        const config = form.homepageSections?.[section.id];
+        if (!config?.enabled) return null;
+        const parsedOrder = Number.parseInt(String(config.order ?? '').trim(), 10);
+        return {
+          id: section.id,
+          label: section.adminLabel,
+          order: Number.isFinite(parsedOrder) && parsedOrder > 0 ? parsedOrder : null,
+        };
+      })
+        .filter(Boolean)
+        .sort((left, right) => {
+          const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
+          const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
+          if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+          return left.label.localeCompare(right.label);
+        }),
+    [form.homepageSections],
   );
 
   useEffect(
@@ -287,6 +348,7 @@ const AdminProductForm = () => {
           comboItems: formatHandleList(comboValues),
           sizeChartImageUrl,
           sizeChartText,
+          homepageSections: createHomepageSectionsState(rawMetafields),
         });
       })
       .catch((err) => setError(err?.message || 'Unable to load product.'))
@@ -331,6 +393,27 @@ const AdminProductForm = () => {
 
   const handleFieldChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleHomepageSectionChange = (sectionId, patch) => {
+    setForm((prev) => {
+      const current = prev.homepageSections?.[sectionId] || {
+        enabled: false,
+        order: '',
+        title: '',
+      };
+      const nextSection = { ...current, ...patch };
+      if (patch.enabled === true && !String(nextSection.order || '').trim()) {
+        nextSection.order = '1';
+      }
+      return {
+        ...prev,
+        homepageSections: {
+          ...(prev.homepageSections || {}),
+          [sectionId]: nextSection,
+        },
+      };
+    });
   };
 
   const handleSizeValuesChange = (value) => {
@@ -721,6 +804,35 @@ const AdminProductForm = () => {
       });
     }
 
+    HOMEPAGE_SECTION_DEFS.forEach((section) => {
+      const config = form.homepageSections?.[section.id];
+      if (!config?.enabled) return;
+      const parsedOrder = Number.parseInt(String(config.order ?? '').trim(), 10);
+      metafields.push({
+        set: 'PRODUCT',
+        namespace: 'custom',
+        key: section.enabledKey,
+        type: 'boolean',
+        value: true,
+      });
+      metafields.push({
+        set: 'PRODUCT',
+        namespace: 'custom',
+        key: section.orderKey,
+        type: 'number_integer',
+        value: Number.isFinite(parsedOrder) && parsedOrder > 0 ? parsedOrder : 1,
+      });
+      if (config.title) {
+        metafields.push({
+          set: 'PRODUCT',
+          namespace: 'custom',
+          key: section.titleKey,
+          type: 'single_line_text_field',
+          value: config.title,
+        });
+      }
+    });
+
     const bundleBaseVariant = form.variants[0] || {};
     const bundlePriceValue =
       form.bundlePrice === '' ? bundleBaseVariant.price : form.bundlePrice;
@@ -999,6 +1111,102 @@ const AdminProductForm = () => {
               ) : (
                 <p className="mt-2 text-xs text-slate-500 italic">No collections found. Create collections first.</p>
               )}
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">Homepage Placement</p>
+                  <p className="text-xs text-slate-400">
+                    Choose which homepage section should show this product and set the display
+                    number like 1, 2, 3.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/homepage-sections"
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                >
+                  Open homepage manager
+                </Link>
+              </div>
+
+              <div className="space-y-3">
+                {HOMEPAGE_SECTION_DEFS.map((section) => {
+                  const config = form.homepageSections?.[section.id] || {
+                    enabled: false,
+                    order: '',
+                  };
+                  const isEnabled = Boolean(config.enabled);
+
+                  return (
+                    <div
+                      key={section.id}
+                      className={`rounded-xl border p-4 transition ${
+                        isEnabled
+                          ? 'border-emerald-500/40 bg-emerald-500/10'
+                          : 'border-slate-800 bg-slate-950'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">{section.adminLabel}</p>
+                          <p className="mt-1 text-xs text-slate-400">{section.description}</p>
+                        </div>
+                        <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={(event) =>
+                              handleHomepageSectionChange(section.id, {
+                                enabled: event.target.checked,
+                              })
+                            }
+                            className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500 accent-emerald-500"
+                          />
+                          Show on homepage
+                        </label>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-[160px_1fr] md:items-end">
+                        <div>
+                          <label className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            Position Number
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={config.order || ''}
+                            onChange={(event) =>
+                              handleHomepageSectionChange(section.id, {
+                                order: event.target.value,
+                              })
+                            }
+                            disabled={!isEnabled}
+                            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-emerald-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="1"
+                          />
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Set `1` for the first product, `2` for the next, `3` for the third.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-300">
+                {homepagePlacements.length ? (
+                  <span>
+                    Homepage order:{' '}
+                    {homepagePlacements
+                      .map((item) => `${item.label} #${item.order ?? '?'}`)
+                      .join(' | ')}
+                  </span>
+                ) : (
+                  <span>This product is not assigned to a homepage section yet.</span>
+                )}
+              </div>
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-4">

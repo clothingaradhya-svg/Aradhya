@@ -66,6 +66,14 @@ const readHomepageOrder = (product, key) => {
 const readHomepageTitle = (product, key) =>
   String(readHomepageMetafield(product, key)?.value ?? '').trim();
 
+const parseOrderValue = (value) => {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const getConfigOrder = (config, productId) =>
+  parseOrderValue(config?.orderById?.[productId]) ?? Number.MAX_SAFE_INTEGER;
+
 const sortSelectedProducts = (products, section) =>
   [...products].sort((left, right) => {
     const orderDiff =
@@ -236,6 +244,37 @@ export default function AdminHomepageSections() {
     }));
   };
 
+  const autoNumberSection = (sectionId) => {
+    setSectionConfigs((prev) => {
+      const current = prev[sectionId];
+      const orderedIds = [...current.selectedIds].sort((leftId, rightId) => {
+        const leftProduct = productsById.get(leftId);
+        const rightProduct = productsById.get(rightId);
+        const orderDiff = getConfigOrder(current, leftId) - getConfigOrder(current, rightId);
+        if (orderDiff !== 0) return orderDiff;
+        return String(leftProduct?.title || '').localeCompare(String(rightProduct?.title || ''));
+      });
+
+      return {
+        ...prev,
+        [sectionId]: {
+          ...current,
+          selectedIds: orderedIds,
+          orderById: Object.fromEntries(
+            orderedIds.map((productId, index) => [productId, String(index + 1)]),
+          ),
+        },
+      };
+    });
+  };
+
+  const clearSection = (sectionId) => {
+    handleSectionChange(sectionId, {
+      selectedIds: [],
+      orderById: {},
+    });
+  };
+
   const toggleProduct = (sectionId, productId) => {
     setSectionConfigs((prev) => {
       const current = prev[sectionId];
@@ -346,6 +385,14 @@ export default function AdminHomepageSections() {
           const config = sectionConfigs[section.id];
           const resolvedTitle = resolveSectionTitle(config, section);
           const selectedSet = new Set(config.selectedIds);
+          const selectedProducts = config.selectedIds
+            .map((productId) => productsById.get(productId))
+            .filter(Boolean)
+            .sort((left, right) => {
+              const orderDiff = getConfigOrder(config, left.id) - getConfigOrder(config, right.id);
+              if (orderDiff !== 0) return orderDiff;
+              return String(left.title || '').localeCompare(String(right.title || ''));
+            });
           const visibleProducts = [...products]
             .filter((product) => {
               const haystack = `${product.title || ''} ${product.handle || ''} ${product.vendor || ''}`;
@@ -355,8 +402,8 @@ export default function AdminHomepageSections() {
               const leftSelected = selectedSet.has(left.id) ? 0 : 1;
               const rightSelected = selectedSet.has(right.id) ? 0 : 1;
               if (leftSelected !== rightSelected) return leftSelected - rightSelected;
-              const leftOrder = Number(config.orderById[left.id] || Number.MAX_SAFE_INTEGER);
-              const rightOrder = Number(config.orderById[right.id] || Number.MAX_SAFE_INTEGER);
+              const leftOrder = getConfigOrder(config, left.id);
+              const rightOrder = getConfigOrder(config, right.id);
               if (leftOrder !== rightOrder) return leftOrder - rightOrder;
               return String(left.title || '').localeCompare(String(right.title || ''));
             });
@@ -414,6 +461,71 @@ export default function AdminHomepageSections() {
                 Homepage title preview: <span className="font-semibold text-white">{resolvedTitle}</span>
               </div>
 
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => autoNumberSection(section.id)}
+                  disabled={!config.selectedIds.length}
+                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Auto-number 1, 2, 3
+                </button>
+                <button
+                  type="button"
+                  onClick={() => clearSection(section.id)}
+                  disabled={!config.selectedIds.length}
+                  className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Clear section
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Selected Order Preview
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      These products will show on the homepage in this order.
+                    </p>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {selectedProducts.length ? `${selectedProducts.length} items` : 'No items yet'}
+                  </div>
+                </div>
+
+                {selectedProducts.length ? (
+                  <div className="mt-4 space-y-2">
+                    {selectedProducts.map((product, index) => {
+                      const orderValue = getConfigOrder(config, product.id);
+                      return (
+                        <div
+                          key={`${section.id}-selected-${product.id}`}
+                          className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2.5"
+                        >
+                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 text-xs font-bold text-emerald-300">
+                            {orderValue === Number.MAX_SAFE_INTEGER ? index + 1 : orderValue}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-white">
+                              {product.title}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-400">
+                              {product.vendor || 'No vendor'} | /{product.handle}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-lg border border-dashed border-slate-800 bg-slate-950/60 px-4 py-5 text-center text-xs text-slate-500">
+                    Select products below and give them position numbers.
+                  </div>
+                )}
+              </div>
+
               <div className="mt-5">
                 <label className="text-xs uppercase tracking-[0.25em] text-slate-500">
                   Search Products
@@ -461,13 +573,13 @@ export default function AdminHomepageSections() {
                             {product.title}
                           </div>
                           <div className="mt-1 text-xs text-slate-400">
-                            {product.vendor || 'No vendor'} · /{product.handle}
+                            {product.vendor || 'No vendor'} | /{product.handle}
                           </div>
                         </div>
                         {isSelected ? (
                           <div className="w-24">
                             <label className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                              Order
+                              Position
                             </label>
                             <input
                               type="number"
