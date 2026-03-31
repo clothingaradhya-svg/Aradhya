@@ -127,6 +127,34 @@ const readCustomMetafield = (metafields, keys) => {
   return normalizeMetafieldText(match?.value);
 };
 
+const SIZE_CHART_IMAGE_KEYS = ['size_chart_image', 'size_chart_url'];
+const SIZE_CHART_TEXT_KEYS = ['size_chart_text', 'size_guide'];
+
+const readSizeChartData = (item) => ({
+  imageUrl: readCustomMetafield(item?.metafields, SIZE_CHART_IMAGE_KEYS),
+  text: readCustomMetafield(item?.metafields, SIZE_CHART_TEXT_KEYS),
+});
+
+const buildSizeGuideEntry = (item, fallbackTitle = 'Size Guide') => {
+  if (!item) return null;
+  const sizeChartData = readSizeChartData(item);
+  const sizes = extractSizeOptions(item);
+  const hasGuide =
+    Boolean(sizeChartData.imageUrl?.trim()) ||
+    Boolean(sizeChartData.text?.trim()) ||
+    sizes.length > 0;
+
+  if (!hasGuide) return null;
+
+  return {
+    handle: item.handle || fallbackTitle.toLowerCase(),
+    title: item.title || fallbackTitle,
+    imageUrl: sizeChartData.imageUrl,
+    text: sizeChartData.text,
+    sizes,
+  };
+};
+
 const ProductDetails = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -156,6 +184,8 @@ const ProductDetails = () => {
   const [selectedFbtItems, setSelectedFbtItems] = useState(new Set());
   const [showSizeModal, setShowSizeModal] = useState(false);
   const [showSizeChart, setShowSizeChart] = useState(false);
+  const [comboSizeGuideEntries, setComboSizeGuideEntries] = useState([]);
+  const [loadingComboSizeGuides, setLoadingComboSizeGuides] = useState(false);
   const [liveReviewItems, setLiveReviewItems] = useState([]);
   const [liveReviewSummary, setLiveReviewSummary] = useState(null);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -168,6 +198,7 @@ const ProductDetails = () => {
     title: '',
     comment: '',
   });
+  const comboSizeGuideSignatureRef = useRef('');
 
   const productHandle = product?.handle || '';
   const reviewData = useMemo(
@@ -424,23 +455,41 @@ const ProductDetails = () => {
   }, [product]);
   const hasSizes = sizeOptions.length > 0;
   const hasColors = colorOptions.length > 0;
-  const sizeChartData = useMemo(
-    () => ({
-      imageUrl: readCustomMetafield(product?.metafields, [
-        'size_chart_image',
-        'size_chart_url',
-      ]),
-      text: readCustomMetafield(product?.metafields, [
-        'size_chart_text',
-        'size_guide',
-      ]),
-    }),
-    [product?.metafields],
-  );
-  const hasSizeChart =
-    Boolean(sizeChartData.imageUrl?.trim()) || Boolean(sizeChartData.text?.trim());
   const comboItems = useMemo(() => product?.comboItems ?? [], [product]);
   const hasComboItems = comboItems.length > 0;
+  const mainSizeGuideEntry = useMemo(
+    () => buildSizeGuideEntry(product, 'Product size guide'),
+    [product],
+  );
+  const fallbackComboSizeGuideEntries = useMemo(
+    () =>
+      comboItems
+        .map((item) => buildSizeGuideEntry(item, item?.title || 'Combo item'))
+        .filter(Boolean),
+    [comboItems],
+  );
+  const sizeGuideEntries = useMemo(() => {
+    const entries = [];
+
+    if (mainSizeGuideEntry) {
+      entries.push(mainSizeGuideEntry);
+    }
+
+    const comboEntries =
+      comboSizeGuideEntries.length > 0
+        ? comboSizeGuideEntries
+        : fallbackComboSizeGuideEntries;
+
+    comboEntries.forEach((entry) => {
+      if (!entry?.handle) return;
+      if (entries.some((item) => item.handle === entry.handle)) return;
+      entries.push(entry);
+    });
+
+    return entries;
+  }, [comboSizeGuideEntries, fallbackComboSizeGuideEntries, mainSizeGuideEntry]);
+  const showStandaloneSizeChartButton =
+    !hasSizes && (hasComboItems || Boolean(mainSizeGuideEntry));
   const enableFrequentlyBoughtTogether = false;
   const isBundleLikeProduct = useMemo(() => {
     if (!product) return false;
@@ -669,7 +718,7 @@ const ProductDetails = () => {
   };
 
   const handleOpenSizeChart = () => {
-    if (!hasSizeChart) {
+    if (!mainSizeGuideEntry && !hasComboItems) {
       notify({
         title: 'Size chart unavailable',
         message: 'No size chart is available for this product yet.',
@@ -678,6 +727,63 @@ const ProductDetails = () => {
     }
     setShowSizeChart(true);
   };
+
+  useEffect(() => {
+    if (!showSizeChart || !hasComboItems) return undefined;
+
+    const signature = comboItems
+      .map((item) => item?.handle)
+      .filter(Boolean)
+      .sort()
+      .join('|');
+
+    if (!signature) {
+      setComboSizeGuideEntries([]);
+      comboSizeGuideSignatureRef.current = '';
+      return undefined;
+    }
+
+    if (comboSizeGuideSignatureRef.current === signature) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadComboSizeGuides = async () => {
+      setLoadingComboSizeGuides(true);
+      try {
+        const hydratedItems = await Promise.all(
+          comboItems.map(async (item) => {
+            if (!item?.handle) return item;
+            try {
+              const fullProduct = await fetchProductByHandle(item.handle);
+              return fullProduct || item;
+            } catch {
+              return item;
+            }
+          }),
+        );
+
+        if (cancelled) return;
+
+        setComboSizeGuideEntries(
+          hydratedItems
+            .map((item) => buildSizeGuideEntry(item, item?.title || 'Combo item'))
+            .filter(Boolean),
+        );
+        comboSizeGuideSignatureRef.current = signature;
+      } finally {
+        if (!cancelled) {
+          setLoadingComboSizeGuides(false);
+        }
+      }
+    };
+
+    loadComboSizeGuides();
+    return () => {
+      cancelled = true;
+    };
+  }, [comboItems, hasComboItems, showSizeChart]);
 
   const handleConfirmSizes = (itemsWithSizes) => {
     const primarySize = hasSizes
@@ -1254,6 +1360,18 @@ const ProductDetails = () => {
               </div>
             )}
 
+            {showStandaloneSizeChartButton && (
+              <div className="mb-6">
+                <button
+                  type="button"
+                  onClick={handleOpenSizeChart}
+                  className="text-xs font-medium text-gray-500 underline hover:text-black"
+                >
+                  SIZE CHART
+                </button>
+              </div>
+            )}
+
             {/* Desktop Add to Bag - Hidden on Mobile, rendered as sticky footer instead */}
             <button
               onClick={handleAddToCart}
@@ -1309,20 +1427,61 @@ const ProductDetails = () => {
                     </button>
                   </div>
                   <div className="max-h-[75vh] space-y-4 overflow-y-auto p-4">
-                    {sizeChartData.imageUrl ? (
-                      <div className="overflow-hidden rounded border border-gray-200 bg-gray-50 p-2">
-                        <img
-                          src={sizeChartData.imageUrl}
-                          alt="Product size chart"
-                          className="max-h-[60vh] w-full object-contain"
-                        />
+                    {loadingComboSizeGuides ? (
+                      <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                        Loading bundle size guide...
                       </div>
                     ) : null}
-                    {sizeChartData.text ? (
-                      <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-line">
-                        {sizeChartData.text}
+
+                    {!loadingComboSizeGuides && sizeGuideEntries.length === 0 ? (
+                      <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                        No size chart is available for this product yet.
                       </div>
                     ) : null}
+
+                    {sizeGuideEntries.map((entry) => (
+                      <div
+                        key={entry.handle}
+                        className="space-y-3 rounded border border-gray-200 bg-gray-50 p-3"
+                      >
+                        {sizeGuideEntries.length > 1 ? (
+                          <p className="text-xs font-bold uppercase tracking-wide text-gray-900">
+                            {entry.title}
+                          </p>
+                        ) : null}
+                        {entry.imageUrl ? (
+                          <div className="overflow-hidden rounded border border-gray-200 bg-white p-2">
+                            <img
+                              src={entry.imageUrl}
+                              alt={`${entry.title} size chart`}
+                              className="max-h-[60vh] w-full object-contain"
+                            />
+                          </div>
+                        ) : null}
+                        {entry.sizes.length > 0 ? (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                              Available Sizes
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {entry.sizes.map((size) => (
+                                <span
+                                  key={`${entry.handle}-${size}`}
+                                  className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700"
+                                >
+                                  {size}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        {entry.text ? (
+                          <div className="rounded border border-gray-200 bg-white p-3 text-sm text-gray-700 whitespace-pre-line">
+                            {entry.text}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
