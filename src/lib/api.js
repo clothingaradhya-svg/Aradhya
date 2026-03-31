@@ -293,43 +293,61 @@ const buildPriceRange = (prices, currencyCode) => {
   };
 };
 
+const extractBundleHandles = (value) => {
+  if (!value) return [];
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      return extractBundleHandles(JSON.parse(trimmed));
+    } catch {
+      return normalizeStringArray(trimmed.replace(/\|/g, ','));
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => extractBundleHandles(entry));
+  }
+
+  if (typeof value === 'object') {
+    const directHandle = value.handle ?? value.slug ?? value.productHandle ?? value.product_handle;
+    if (directHandle) {
+      return [String(directHandle).trim()];
+    }
+
+    return [
+      ...extractBundleHandles(value.items),
+      ...extractBundleHandles(value.products),
+      ...extractBundleHandles(value.handles),
+      ...extractBundleHandles(value.value),
+    ];
+  }
+
+  return [];
+};
+
 const deriveComboHandles = (product) => {
   const metafields = Array.isArray(product?.metafields) ? product.metafields : [];
-  const bundleFields = metafields.filter(
-    (field) =>
-      field?.namespace === 'custom' &&
-      (field?.key === 'combo_items' || field?.key === 'bundle_items'),
-  );
+  const bundleFields = metafields.filter((field) => {
+    const namespace = normaliseTokenValue(field?.namespace);
+    const key = normaliseTokenValue(field?.key);
+    return (
+      namespace === 'custom' &&
+      (key === 'combo_items' || key === 'bundle_items')
+    );
+  });
   if (!bundleFields.length) return [];
 
-  const collected = [];
-  bundleFields.forEach((field) => {
-    const value = field?.value;
-    if (!value) return;
-    if (Array.isArray(value)) {
-      value.forEach((item) => collected.push(String(item)));
-      return;
-    }
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((item) => collected.push(String(item)));
-          return;
-        }
-      } catch {
-        normalizeStringArray(value.replace(/\|/g, ',')).forEach((item) =>
-          collected.push(item),
-        );
-        return;
-      }
-      normalizeStringArray(value.replace(/\|/g, ',')).forEach((item) =>
-        collected.push(item),
-      );
-    }
-  });
+  const collected = bundleFields.flatMap((field) => extractBundleHandles(field?.value));
 
-  return Array.from(new Set(collected.map((item) => item.trim()).filter(Boolean)));
+  return Array.from(
+    new Set(
+      collected
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean),
+    ),
+  );
 };
 
 const mapProduct = (product) => {
@@ -716,7 +734,17 @@ const fetchProductsByHandles = async (handles) => {
     })}`,
   );
   const items = extractList(payload, 'products by handle');
-  return items.map(mapProduct).filter(Boolean);
+  const orderByHandle = new Map(
+    handles.map((handle, index) => [normaliseTokenValue(handle), index]),
+  );
+  return items
+    .map(mapProduct)
+    .filter(Boolean)
+    .sort((left, right) => {
+      const leftOrder = orderByHandle.get(normaliseTokenValue(left?.handle));
+      const rightOrder = orderByHandle.get(normaliseTokenValue(right?.handle));
+      return (leftOrder ?? Number.MAX_SAFE_INTEGER) - (rightOrder ?? Number.MAX_SAFE_INTEGER);
+    });
 };
 
 export const fetchProductByHandle = async (handle) => {

@@ -443,6 +443,32 @@ const ProductDetails = () => {
     Boolean(sizeChartData.imageUrl?.trim()) || Boolean(sizeChartData.text?.trim());
   const comboItems = useMemo(() => product?.comboItems ?? [], [product]);
   const hasComboItems = comboItems.length > 0;
+  const isBundleLikeProduct = useMemo(() => {
+    if (!product) return false;
+    const hasBundleMetafield = Array.isArray(product.metafields)
+      ? product.metafields.some((field) => {
+        const namespace = normaliseTokenValue(field?.namespace);
+        const key = normaliseTokenValue(field?.key);
+        return (
+          namespace === 'custom' &&
+          (key === 'combo_items' || key === 'bundle_items')
+        );
+      })
+      : false;
+    if (hasBundleMetafield) return true;
+
+    const bundleText = [
+      product.title,
+      product.productType,
+      Array.isArray(product.tags) ? product.tags.join(' ') : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const token = normaliseTokenValue(bundleText);
+    return ['bundle', 'combo', 'combination', 'set', 'outfit'].some((keyword) =>
+      token.includes(keyword),
+    );
+  }, [product]);
   const selectedComboList = useMemo(
     () => comboItems.filter((item) => selectedComboItems.has(item.handle)),
     [comboItems, selectedComboItems],
@@ -630,6 +656,14 @@ const ProductDetails = () => {
       return;
     }
 
+    if (isBundleLikeProduct) {
+      notify({
+        title: 'Bundle unavailable',
+        message: 'Single-product selection is not linked for this bundle yet.',
+      });
+      return;
+    }
+
     // If FBT items are selected, we MUST ask for their sizes first
     if (selectedFbtItems.size > 0) {
       setShowSizeModal(true);
@@ -697,9 +731,22 @@ const ProductDetails = () => {
 
     // Helper to check if product is a combo
     const isComboProduct = (item) => {
+      const productType = String(item?.productType || item?.type || '').toLowerCase();
       const title = String(item?.title || '').toLowerCase();
-      const tags = Array.isArray(item?.tags) ? item.tags.map(t => String(t).toLowerCase()) : [];
-      return title.includes('combo') || title.includes('combination') || tags.some(tag => tag.includes('combo')) || tags.some(tag => tag.includes('combination'));
+      const tags = Array.isArray(item?.tags) ? item.tags.map((tag) => String(tag).toLowerCase()) : [];
+      return (
+        productType.includes('bundle') ||
+        productType.includes('combo') ||
+        productType.includes('set') ||
+        title.includes('bundle') ||
+        title.includes('combo') ||
+        title.includes('combination') ||
+        title.includes('set') ||
+        tags.some((tag) => tag.includes('bundle')) ||
+        tags.some((tag) => tag.includes('combo')) ||
+        tags.some((tag) => tag.includes('combination')) ||
+        tags.some((tag) => tag.includes('set'))
+      );
     };
 
     // Helper to check category
@@ -729,19 +776,10 @@ const ProductDetails = () => {
 
     async function loadRelated() {
       if (!product) return;
-      if (hasComboItems) {
+      if (hasComboItems || isBundleLikeProduct) {
         setRelatedProducts([]);
         return;
       }
-
-      // START FBT RESTRICTION CHANGE
-      // Only load FBT if the current product is a "Combo" or "Full Product"
-      // Assuming "full products" maps to the combo concept or explicit override.
-      if (!isComboProduct(product)) {
-        setRelatedProducts([]);
-        return;
-      }
-      // END FBT RESTRICTION CHANGE
 
       const signature = [
         product.handle,
@@ -869,7 +907,7 @@ const ProductDetails = () => {
     return () => {
       cancelled = true;
     };
-  }, [product, hasComboItems]);
+  }, [product, hasComboItems, isBundleLikeProduct]);
 
   // Fetch "You Might Also Like" products (Same Collection or Category)
   useEffect(() => {
@@ -1253,6 +1291,12 @@ const ProductDetails = () => {
                 onSelectionChange={setSelectedComboItems}
               />
             )}
+
+            {isBundleLikeProduct && !hasComboItems ? (
+              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Bundle item selection is not available for this product yet.
+              </div>
+            ) : null}
 
             {/* Frequently Bought Together Section (Moved Below Combo) */}
             {relatedProducts.length > 0 && !hasComboItems && (
