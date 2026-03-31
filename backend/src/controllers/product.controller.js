@@ -527,7 +527,50 @@ const productCompactWithMetafieldsSelect = {
     select: {
       namespace: true,
       key: true,
+      type: true,
       value: true,
+    },
+  },
+};
+
+const productDetailSelect = {
+  ...productCompactWithMetafieldsSelect,
+  descriptionHtml: true,
+  media: {
+    select: {
+      url: true,
+      alt: true,
+      type: true,
+      position: true,
+    },
+    orderBy: { position: 'asc' },
+  },
+  reviews: {
+    where: { status: 'PUBLISHED' },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      rating: true,
+      title: true,
+      comment: true,
+      status: true,
+      createdAt: true,
+      media: {
+        select: {
+          id: true,
+          url: true,
+          createdAt: true,
+        },
+      },
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+  },
+  _count: {
+    select: {
+      media: true,
+      reviews: { where: { status: 'PUBLISHED' } },
     },
   },
 };
@@ -863,14 +906,14 @@ exports.getProduct = async (req, res, next) => {
 
     let product = await prisma.product.findUnique({
       where,
-      include: productInclude,
+      select: productDetailSelect,
     });
 
     // Fallback: if cuid lookup failed, try by handle (rare edge case)
     if (!product && isCuid) {
       product = await prisma.product.findUnique({
         where: { handle: identifier },
-        include: productInclude,
+        select: productDetailSelect,
       });
     }
 
