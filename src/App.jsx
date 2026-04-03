@@ -20,6 +20,7 @@ import BlogPage from './pages/BlogPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
+import ShiprocketPage from './pages/ShiprocketPage';
 import WishlistPage from './pages/WishlistPage';
 import SearchPage from './pages/SearchPage';
 import CancelRefundExchange from './pages/CancelRefundExchange';
@@ -96,6 +97,7 @@ export default function App() {
             <Route path="contact" element={<ContactPage />} />
             <Route path="blog" element={<BlogPage />} />
             <Route path="faq" element={<ContactPage />} />
+            <Route path="shiprocket-demo" element={<ShiprocketPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="profile" element={<ProfilePage />} />

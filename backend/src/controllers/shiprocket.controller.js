@@ -1,81 +1,111 @@
-const buildServiceabilityUrl = ({
-  pickupPostcode,
-  deliveryPostcode,
-  weight = "0.5",
-  cod = "1",
-}) =>
-  `https://apiv2.shiprocket.in/v1/external/courier/serviceability/?pickup_postcode=${encodeURIComponent(
-    pickupPostcode,
-  )}&delivery_postcode=${encodeURIComponent(deliveryPostcode)}&weight=${encodeURIComponent(
-    weight,
-  )}&cod=${encodeURIComponent(cod)}`;
+const { env } = require("../config");
+const shiprocketService = require("../services/shiprocket.service");
+const { sendError, sendSuccess } = require("../utils/response");
+const {
+  createShiprocketOrderSchema,
+  serviceabilityQuerySchema,
+  trackingQuerySchema,
+} = require("../validators/shiprocket.validator");
 
-const buildTrackingUrl = ({ awb, orderId }) => {
-  const idPath = awb
-    ? `awb/${encodeURIComponent(awb)}`
-    : `order/${encodeURIComponent(orderId)}`;
-  return `https://apiv2.shiprocket.in/v1/external/courier/track/${idPath}`;
+const formatValidationDetails = (issues = []) =>
+  issues.map((issue) => ({
+    field: issue.path?.join(".") || "root",
+    message: issue.message,
+  }));
+
+const parseRequest = (schema, payload, res) => {
+  const parsed = schema.safeParse(payload);
+
+  if (parsed.success) return parsed.data;
+
+  sendError(res, 400, "Validation failed.", formatValidationDetails(parsed.error.issues));
+  return null;
 };
 
-const parseShiprocketPayload = async (response) => {
-  const text = await response.text();
-  if (!text) return {};
+const handleShiprocketError = (res, error, fallbackMessage) => {
+  if (error?.status >= 500) {
+    console.error("[Shiprocket]", error);
+  }
+
+  return sendError(
+    res,
+    error?.status || 500,
+    error?.message || fallbackMessage,
+    error?.details || null,
+  );
+};
+
+exports.authenticate = async (_req, res) => {
   try {
-    return JSON.parse(text);
-  } catch {
-    return { raw: text };
+    const data = await shiprocketService.getAuthStatus();
+    return sendSuccess(res, data, null, "Shiprocket authentication is ready.");
+  } catch (error) {
+    return handleShiprocketError(res, error, "Unable to authenticate Shiprocket.");
+  }
+};
+
+exports.createOrder = async (req, res) => {
+  const parsedBody = parseRequest(createShiprocketOrderSchema, req.body, res);
+  if (!parsedBody) return undefined;
+
+  try {
+    const data = await shiprocketService.createOrder(parsedBody);
+    return sendSuccess(res, data, null, "Shiprocket order created successfully.");
+  } catch (error) {
+    return handleShiprocketError(res, error, "Unable to create Shiprocket order.");
+  }
+};
+
+exports.trackShipment = async (req, res) => {
+  const parsedQuery = parseRequest(
+    trackingQuerySchema,
+    {
+      awb: req.query?.awb,
+      orderId: req.query?.order_id || req.query?.orderId,
+    },
+    res,
+  );
+  if (!parsedQuery) return undefined;
+
+  try {
+    const data = await shiprocketService.trackShipment(parsedQuery);
+    return sendSuccess(res, data, null, "Tracking details fetched successfully.");
+  } catch (error) {
+    return handleShiprocketError(res, error, "Unable to fetch tracking details.");
+  }
+};
+
+exports.checkServiceability = async (req, res) => {
+  const parsedQuery = parseRequest(
+    serviceabilityQuerySchema,
+    {
+      pickupPostcode:
+        req.query?.pickup_postcode ||
+        req.query?.pickupPostcode ||
+        env.shiprocketPickupPincode,
+      deliveryPostcode: req.query?.delivery_postcode || req.query?.deliveryPostcode,
+      weight: req.query?.weight,
+      cod: req.query?.cod,
+    },
+    res,
+  );
+  if (!parsedQuery) return undefined;
+
+  try {
+    const data = await shiprocketService.checkServiceability(parsedQuery);
+    return sendSuccess(res, data, null, "Serviceability fetched successfully.");
+  } catch (error) {
+    return handleShiprocketError(res, error, "Unable to fetch serviceability.");
   }
 };
 
 exports.proxyShiprocket = async (req, res) => {
-  const token = process.env.SHIPROCKET_TOKEN || process.env.VITE_SHIPROCKET_TOKEN;
-  if (!token) {
-    return res.status(500).json({ error: "Server not configured for Shiprocket." });
-  }
-
   const awb = String(req.query?.awb || "").trim();
-  const orderId = String(req.query?.order_id || "").trim();
-  const pickupPostcode = String(req.query?.pickup_postcode || "").trim();
-  const deliveryPostcode = String(req.query?.delivery_postcode || "").trim();
-  const weight = String(req.query?.weight || "0.5").trim();
-  const cod = String(req.query?.cod || "1").trim();
+  const orderId = String(req.query?.order_id || req.query?.orderId || "").trim();
 
-  let targetUrl = null;
   if (awb || orderId) {
-    targetUrl = buildTrackingUrl({ awb, orderId });
-  } else if (pickupPostcode && deliveryPostcode) {
-    targetUrl = buildServiceabilityUrl({
-      pickupPostcode,
-      deliveryPostcode,
-      weight,
-      cod,
-    });
-  } else {
-    return res
-      .status(400)
-      .json({ error: "Missing tracking or serviceability parameters." });
+    return exports.trackShipment(req, res);
   }
 
-  try {
-    const response = await fetch(targetUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const payload = await parseShiprocketPayload(response);
-
-    if (!response.ok) {
-      return res.status(502).json({
-        error: "Shiprocket request failed.",
-        details: payload?.message || payload?.errors || payload?.raw || null,
-      });
-    }
-
-    return res.status(200).json(payload);
-  } catch (error) {
-    console.error("Shiprocket proxy error:", error);
-    return res.status(500).json({ error: "Unable to reach Shiprocket." });
-  }
+  return exports.checkServiceability(req, res);
 };

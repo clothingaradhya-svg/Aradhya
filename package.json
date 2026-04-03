@@ -21,6 +21,7 @@
     "@react-three/fiber": "^8.16.6",
     "@tailwindcss/vite": "^4.1.16",
     "@types/three": "^0.164.0",
+    "axios": "^1.14.0",
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.9.0",
