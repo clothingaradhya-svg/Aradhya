@@ -3,6 +3,7 @@ const { z } = require("zod");
 
 const { env } = require("../config");
 const { getPrisma } = require("../db/prismaClient");
+const orderShippingService = require("../services/orderShipping.service");
 const { roundMoney, toMoney } = require("../utils/discounts");
 const { getFastrrConfig, isFastrrConfigured, postToFastrr } = require("../utils/fastrr");
 const { sendError, sendSuccess } = require("../utils/response");
@@ -551,7 +552,7 @@ const syncFastrrOrder = async (prisma, order) => {
   const nextStatus = deriveStatusFromFastrr(details, order?.status);
   const nextPaymentMethod = derivePaymentMethod(details, payments, order?.paymentMethod);
 
-  return prisma.order.update({
+  let updated = await prisma.order.update({
     where: { id: order.id },
     data: {
       status: nextStatus,
@@ -560,6 +561,27 @@ const syncFastrrOrder = async (prisma, order) => {
       totals: nextTotals,
     },
   });
+
+  if (orderShippingService.shouldCreateShipmentForOrder(updated)) {
+    try {
+      const shipment = await orderShippingService.createShiprocketShipmentForOrder(updated);
+      if (shipment?.shippingPatch) {
+        updated = await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            shipping: shipment.shippingPatch,
+          },
+        });
+      }
+    } catch (error) {
+      console.error(
+        `[Shiprocket] Unable to provision shipment for Fastrr order ${updated?.number || updated?.id}:`,
+        error?.message || error,
+      );
+    }
+  }
+
+  return updated;
 };
 
 exports.getFastrrPublicConfig = async (_req, res) => {
@@ -897,8 +919,10 @@ exports.handleOrderWebhook = async (req, res, next) => {
     const nextTotals = mergeTotalsFromFastrr(existing?.totals || {}, detailsLikePayload, []);
     const nextPaymentMethod = derivePaymentMethod(detailsLikePayload, [], existing?.paymentMethod);
 
+    let order = null;
+
     if (existing) {
-      await prisma.order.update({
+      order = await prisma.order.update({
         where: { id: existing.id },
         data: {
           status: nextStatus,
@@ -909,7 +933,7 @@ exports.handleOrderWebhook = async (req, res, next) => {
         },
       });
     } else {
-      await prisma.order.create({
+      order = await prisma.order.create({
         data: {
           number: createOrderNumber(),
           status: nextStatus,
@@ -919,6 +943,25 @@ exports.handleOrderWebhook = async (req, res, next) => {
           items: hydratedItems,
         },
       });
+    }
+
+    if (orderShippingService.shouldCreateShipmentForOrder(order)) {
+      try {
+        const shipment = await orderShippingService.createShiprocketShipmentForOrder(order);
+        if (shipment?.shippingPatch) {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              shipping: shipment.shippingPatch,
+            },
+          });
+        }
+      } catch (error) {
+        console.error(
+          `[Shiprocket] Unable to provision shipment from Fastrr webhook for ${order?.number || order?.id}:`,
+          error?.message || error,
+        );
+      }
     }
 
     return res.status(200).json({ ok: true });

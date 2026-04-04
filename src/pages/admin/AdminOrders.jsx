@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { adminFetchOrders, adminUpdateOrder, formatMoney } from '../../lib/api';
+import {
+  adminCreateShiprocketShipment,
+  adminFetchOrders,
+  adminRefreshShiprocketTracking,
+  adminUpdateOrder,
+  formatMoney,
+} from '../../lib/api';
 import { useAdminAuth } from '../../contexts/admin-auth-context';
 import { useAdminToast } from '../../components/admin/AdminToaster';
 import { motion } from 'framer-motion';
@@ -96,6 +102,7 @@ const AdminOrders = () => {
   const [error, setError] = useState('');
   const [updatingOrderId, setUpdatingOrderId] = useState('');
   const [savingTrackingOrderId, setSavingTrackingOrderId] = useState('');
+  const [shiprocketActionOrderId, setShiprocketActionOrderId] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState('');
   const [trackingDrafts, setTrackingDrafts] = useState({});
 
@@ -234,6 +241,40 @@ const AdminOrders = () => {
     }
   };
 
+  const createShipment = async (order) => {
+    if (!token || !order?.id) return;
+    setShiprocketActionOrderId(order.id);
+    try {
+      const payload = await adminCreateShiprocketShipment(token, order.id);
+      const wasExisting = Boolean(payload?.alreadyExists);
+      toast.success(
+        wasExisting ? 'Shipment Already Exists' : 'Shipment Created',
+        wasExisting
+          ? 'This order already has Shiprocket shipment details.'
+          : 'Shiprocket shipment created and saved on the order.',
+      );
+      await loadOrders();
+    } catch (err) {
+      toast.error('Shipment Failed', err?.message || 'Unable to create Shiprocket shipment.');
+    } finally {
+      setShiprocketActionOrderId('');
+    }
+  };
+
+  const refreshTracking = async (order) => {
+    if (!token || !order?.id) return;
+    setShiprocketActionOrderId(order.id);
+    try {
+      await adminRefreshShiprocketTracking(token, order.id);
+      toast.success('Tracking Refreshed', 'Latest Shiprocket tracking was saved.');
+      await loadOrders();
+    } catch (err) {
+      toast.error('Refresh Failed', err?.message || 'Unable to refresh Shiprocket tracking.');
+    } finally {
+      setShiprocketActionOrderId('');
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -365,6 +406,13 @@ const AdminOrders = () => {
                 const steps = trackingSteps(order);
                 const isExpanded = expandedOrderId === order.id;
                 const trackingDraft = getTrackingDraft(order);
+                const shiprocketStatus = String(shipping?.shiprocketStatus || '').trim();
+                const shiprocketOrderId = String(shipping?.shiprocketOrderId || '').trim();
+                const shiprocketShipmentId = String(shipping?.shiprocketShipmentId || '').trim();
+                const awbCode = String(
+                  shipping?.awbCode || shipping?.awb || shipping?.trackingNumber || '',
+                ).trim();
+                const isShiprocketWorking = shiprocketActionOrderId === order.id;
 
                 return (
                   <React.Fragment key={order.id}>
@@ -457,6 +505,29 @@ const AdminOrders = () => {
                                     </div>
                                   ))}
                                 </div>
+
+                                <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => createShipment(order)}
+                                    disabled={isShiprocketWorking}
+                                    className="rounded-lg border border-blue-500/40 px-3 py-2 text-xs font-semibold text-blue-300 hover:bg-blue-500/10 disabled:opacity-60"
+                                  >
+                                    {isShiprocketWorking
+                                      ? 'Working...'
+                                      : shiprocketOrderId
+                                        ? 'Shipment Saved'
+                                        : 'Create Shiprocket Shipment'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => refreshTracking(order)}
+                                    disabled={isShiprocketWorking || (!shiprocketOrderId && !awbCode)}
+                                    className="rounded-lg border border-amber-500/40 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-500/10 disabled:opacity-60"
+                                  >
+                                    {isShiprocketWorking ? 'Working...' : 'Refresh Shiprocket Tracking'}
+                                  </button>
+                                </div>
                               </div>
 
                               <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
@@ -475,6 +546,12 @@ const AdminOrders = () => {
                                   <p className="pt-2 text-xs text-slate-500">
                                     Last update: {formatDateTime(order?.updatedAt)}
                                   </p>
+                                  <div className="pt-3 text-xs text-slate-400 space-y-1">
+                                    <p>Shiprocket status: {shiprocketStatus || '-'}</p>
+                                    <p>Shiprocket order ID: {shiprocketOrderId || '-'}</p>
+                                    <p>Shipment ID: {shiprocketShipmentId || '-'}</p>
+                                    <p>AWB: {awbCode || '-'}</p>
+                                  </div>
                                 </div>
                               </div>
                             </div>

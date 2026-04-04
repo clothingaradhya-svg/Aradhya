@@ -4,6 +4,7 @@ const { z } = require("zod");
 const { getPrisma } = require("../db/prismaClient");
 const { OrderStatus, OrderRequestType } = require("@prisma/client");
 const { sendSuccess, sendError } = require("../utils/response");
+const orderShippingService = require("../services/orderShipping.service");
 const {
   roundMoney,
   toMoney,
@@ -346,6 +347,30 @@ const verifyRazorpaySignature = ({ razorpayOrderId, razorpayPaymentId, razorpayS
   return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
 };
 
+const tryProvisionShiprocketShipment = async (prisma, order) => {
+  if (!orderShippingService.shouldCreateShipmentForOrder(order)) {
+    return order;
+  }
+
+  try {
+    const result = await orderShippingService.createShiprocketShipmentForOrder(order);
+    if (!result?.shippingPatch) return order;
+
+    return prisma.order.update({
+      where: { id: order.id },
+      data: {
+        shipping: result.shippingPatch,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `[Shiprocket] Unable to provision shipment for order ${order?.number || order?.id}:`,
+      error?.message || error,
+    );
+    return order;
+  }
+};
+
 exports.createOrder = async (req, res, next) => {
   try {
     const payload = createOrderSchema.parse(req.body);
@@ -375,8 +400,10 @@ exports.createOrder = async (req, res, next) => {
       },
     });
 
+    const orderWithShipment = await tryProvisionShiprocketShipment(prisma, order);
+
     res.status(201);
-    return sendSuccess(res, sanitizeOrder(order));
+    return sendSuccess(res, sanitizeOrder(orderWithShipment));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, 400, error.errors[0]?.message || "Invalid payload");
@@ -527,8 +554,9 @@ exports.confirmRazorpayCheckout = async (req, res, next) => {
         userId: req.user?.id,
       },
     });
+    const orderWithShipment = await tryProvisionShiprocketShipment(prisma, created);
 
-    return sendSuccess(res, sanitizeOrder(created));
+    return sendSuccess(res, sanitizeOrder(orderWithShipment));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, 400, error.errors[0]?.message || "Invalid payload");
@@ -831,6 +859,82 @@ exports.updateOrder = async (req, res, next) => {
     }
     if (error.code === "P2025") {
       return sendError(res, 404, "Order not found");
+    }
+    return next(error);
+  }
+};
+
+exports.createShiprocketShipment = async (req, res, next) => {
+  try {
+    const prisma = await getPrisma();
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!order) {
+      return sendError(res, 404, "Order not found");
+    }
+
+    const result = await orderShippingService.createShiprocketShipmentForOrder(order);
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        shipping: result.shippingPatch,
+      },
+    });
+
+    return sendSuccess(
+      res,
+      {
+        order: sanitizeOrder(updated),
+        shipment: result.shipment || null,
+        tracking: result.tracking || null,
+        alreadyExists: Boolean(result.alreadyExists),
+      },
+      null,
+      result.alreadyExists
+        ? "Shiprocket shipment already exists for this order."
+        : "Shiprocket shipment created successfully.",
+    );
+  } catch (error) {
+    if (error?.status) {
+      return sendError(res, error.status, error.message || "Unable to create Shiprocket shipment.");
+    }
+    return next(error);
+  }
+};
+
+exports.refreshShiprocketTracking = async (req, res, next) => {
+  try {
+    const prisma = await getPrisma();
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!order) {
+      return sendError(res, 404, "Order not found");
+    }
+
+    const result = await orderShippingService.refreshShiprocketTrackingForOrder(order);
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        shipping: result.shippingPatch,
+      },
+    });
+
+    return sendSuccess(
+      res,
+      {
+        order: sanitizeOrder(updated),
+        tracking: result.tracking,
+      },
+      null,
+      "Shiprocket tracking refreshed successfully.",
+    );
+  } catch (error) {
+    if (error?.status) {
+      return sendError(res, error.status, error.message || "Unable to refresh Shiprocket tracking.");
     }
     return next(error);
   }

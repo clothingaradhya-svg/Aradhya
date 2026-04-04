@@ -15,6 +15,18 @@ router.post("/:id/exchange", protect, orderController.createExchangeRequest);
 router.get("/requests/my", protect, orderController.listMyOrderRequests);
 router.get("/my", protect, orderController.getMyOrders);
 router.get("/", protect, requireRole("ADMIN"), orderController.listOrders);
+router.post(
+  "/:id/shiprocket",
+  protect,
+  requireRole("ADMIN"),
+  orderController.createShiprocketShipment,
+);
+router.post(
+  "/:id/shiprocket/track",
+  protect,
+  requireRole("ADMIN"),
+  orderController.refreshShiprocketTracking,
+);
 router.patch("/:id", protect, requireRole("ADMIN"), orderController.updateOrder);
 
 module.exports = router;

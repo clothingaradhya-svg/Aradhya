@@ -986,6 +986,20 @@ export const adminUpdateOrder = async (token, orderId, data) =>
     }),
   );
 
+export const adminCreateShiprocketShipment = async (token, orderId) =>
+  unwrap(
+    await requestWithAuth(`/orders/${encodeURIComponent(orderId)}/shiprocket`, token, {
+      method: 'POST',
+    }),
+  );
+
+export const adminRefreshShiprocketTracking = async (token, orderId) =>
+  unwrap(
+    await requestWithAuth(`/orders/${encodeURIComponent(orderId)}/shiprocket/track`, token, {
+      method: 'POST',
+    }),
+  );
+
 export const adminFetchDiscounts = async (token) => {
   const payload = await requestWithAuth('/discounts', token);
   return unwrap(payload) || [];
