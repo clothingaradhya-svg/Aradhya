@@ -11,8 +11,10 @@ import CartPage from './pages/CartPage';
 import AllProductsPage from './pages/AllProductsPage';
 import Address from './pages/Address';
 import Payment from './pages/Payment';
+import OrderConfirmation from './pages/OrderConfirmation';
 import OrderDetails from './pages/OrderDetails';
 import OrderDetailPage from './pages/OrderDetailPage';
+import TrackShipmentPage from './pages/TrackShipmentPage';
 import LegalPage from './pages/LegalPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
@@ -88,8 +90,10 @@ export default function App() {
             <Route path="cart" element={<CartPage />} />
             <Route path="checkout/address" element={<Address />} />
             <Route path="checkout/payment" element={<Payment />} />
+            <Route path="checkout/success" element={<OrderConfirmation />} />
             <Route path="orders" element={<OrderDetails />} />
             <Route path="orders/:id" element={<OrderDetailPage />} />
+            <Route path="track/:awb" element={<TrackShipmentPage />} />
             <Route path="cancel-refund-exchange" element={<CancelRefundExchange />} />
             <Route path="legal" element={<Navigate to="/legal/privacy-policy" replace />} />
             <Route path="legal/:section" element={<LegalPage />} />

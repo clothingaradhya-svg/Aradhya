@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api
+Disallow: /api/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /checkout/
+Disallow: /login
+Disallow: /register
+Disallow: /profile
+Disallow: /wishlist
+Disallow: /orders
+Disallow: /orders/
+
+Sitemap: https://thehouseofaradhya.com/sitemap.xml

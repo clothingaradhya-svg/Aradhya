@@ -277,6 +277,26 @@ const buildCreateOrderPayload = (input) => {
   };
 };
 
+const normalizeAssignedAwbResponse = (payload = {}) => {
+  const source = payload?.response?.data || payload?.data || payload || {};
+
+  return {
+    summary: {
+      shiprocketOrderId:
+        source?.order_id || payload?.order_id || payload?.orderId || null,
+      shipmentId:
+        source?.shipment_id || payload?.shipment_id || payload?.shipmentId || null,
+      awbCode: source?.awb_code || payload?.awb_code || null,
+      courierName: source?.courier_name || payload?.courier_name || null,
+      courierCompanyId:
+        source?.courier_company_id || payload?.courier_company_id || null,
+      status:
+        Number(payload?.awb_assign_status || 0) === 1 ? "AWB Assigned" : "Assignment pending",
+    },
+    raw: payload,
+  };
+};
+
 const normalizeTrackingActivities = (payload = {}) => {
   const trackingData = payload?.tracking_data || payload?.data || payload || {};
   const activitiesSource = Array.isArray(trackingData?.shipment_track_activities)
@@ -403,6 +423,10 @@ const checkServiceability = async ({
   deliveryPostcode,
   weight,
   cod,
+  length,
+  breadth,
+  height,
+  declaredValue,
 }) => {
   const response = await requestWithAuth({
     url: "/courier/serviceability/",
@@ -412,10 +436,28 @@ const checkServiceability = async ({
       delivery_postcode: deliveryPostcode,
       weight,
       cod,
+      length,
+      breadth,
+      height,
+      declared_value: declaredValue,
     },
   });
 
   return response.data;
+};
+
+const assignAwb = async ({ shipmentId, courierId, status }) => {
+  const response = await requestWithAuth({
+    url: "/courier/assign/awb",
+    method: "POST",
+    data: compactObject({
+      shipment_id: shipmentId,
+      courier_id: courierId,
+      status,
+    }),
+  });
+
+  return normalizeAssignedAwbResponse(response.data);
 };
 
 module.exports = {
@@ -423,4 +465,5 @@ module.exports = {
   createOrder,
   trackShipment,
   checkServiceability,
+  assignAwb,
 };

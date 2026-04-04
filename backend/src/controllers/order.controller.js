@@ -5,6 +5,8 @@ const { getPrisma } = require("../db/prismaClient");
 const { OrderStatus, OrderRequestType } = require("@prisma/client");
 const { sendSuccess, sendError } = require("../utils/response");
 const orderShippingService = require("../services/orderShipping.service");
+const razorpayService = require("../services/razorpay.service");
+const shiprocketService = require("../services/shiprocket.service");
 const {
   roundMoney,
   toMoney,
@@ -13,7 +15,6 @@ const {
   calculateDiscountAmount,
 } = require("../utils/discounts");
 
-const COD_ADVANCE_AMOUNT = 50;
 const PAYMENT_FEES = {
   COD: 0,
 };
@@ -24,6 +25,7 @@ const shippingSchema = z.object({
   phone: z.string().optional(),
   address: z.string().min(1),
   city: z.string().optional(),
+  state: z.string().optional(),
   postalCode: z.string().optional(),
   trackingNumber: z.string().optional(),
   awb: z.string().optional(),
@@ -33,6 +35,16 @@ const shippingSchema = z.object({
   shiprocketOrderId: z.string().optional(),
   estimatedDelivery: z.string().optional(),
 }).passthrough();
+
+const checkoutShippingSchema = shippingSchema.extend({
+  phone: z.string().trim().min(10),
+  city: z.string().trim().min(1),
+  state: z.string().trim().min(1),
+  postalCode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Postal code must be a valid 6-digit pincode."),
+});
 
 const discountInputSchema = z
   .object({
@@ -68,6 +80,19 @@ const createOrderSchema = z.object({
     )
     .min(1),
   discount: discountInputSchema.optional().nullable(),
+});
+
+const createCheckoutOrderSchema = z.object({
+  order: createOrderSchema.extend({
+    shipping: checkoutShippingSchema,
+  }),
+  payment: z
+    .object({
+      razorpayOrderId: z.string().min(1),
+      razorpayPaymentId: z.string().min(1),
+      razorpaySignature: z.string().min(1),
+    })
+    .optional(),
 });
 
 const updateOrderSchema = z.object({
@@ -210,12 +235,11 @@ const getPaymentBreakdown = (paymentMethod, total) => {
   const normalizedTotal = roundMoney(Math.max(toMoney(total, 0), 0));
 
   if (normalizedMethod === "COD") {
-    const payableNow = roundMoney(Math.min(COD_ADVANCE_AMOUNT, normalizedTotal));
     return {
-      advanceRequired: true,
-      advanceAmount: payableNow,
-      payableNow,
-      dueOnDelivery: roundMoney(Math.max(normalizedTotal - payableNow, 0)),
+      advanceRequired: false,
+      advanceAmount: 0,
+      payableNow: 0,
+      dueOnDelivery: normalizedTotal,
     };
   }
 
@@ -324,16 +348,6 @@ const calculateCanonicalTotals = async (prisma, payload) => {
   };
 };
 
-const getRazorpayCreds = () => {
-  const keyId = String(process.env.RAZORPAY_KEY_ID || "").trim();
-  const keySecret = String(process.env.RAZORPAY_KEY_SECRET || "").trim();
-  if (!keyId || !keySecret) return null;
-  return { keyId, keySecret };
-};
-
-const createRazorpayAuthorization = ({ keyId, keySecret }) =>
-  `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
-
 const verifyRazorpaySignature = ({ razorpayOrderId, razorpayPaymentId, razorpaySignature, keySecret }) => {
   const expected = crypto
     .createHmac("sha256", keySecret)
@@ -367,32 +381,41 @@ const tryProvisionShiprocketShipment = async (prisma, order) => {
       `[Shiprocket] Unable to provision shipment for order ${order?.number || order?.id}:`,
       error?.message || error,
     );
-    return order;
+    try {
+      return await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          shipping: {
+            ...(order.shipping || {}),
+            shiprocketStatus: "Shipment Pending",
+            shiprocketProvisioningError: error?.message || "Unable to create shipment.",
+            shiprocketLastSyncedAt: new Date().toISOString(),
+          },
+        },
+      });
+    } catch {
+      return order;
+    }
   }
 };
 
 exports.createOrder = async (req, res, next) => {
   try {
     const payload = createOrderSchema.parse(req.body);
-    if (normalizePaymentMethod(payload.paymentMethod) === "COD") {
-      return sendError(
-        res,
-        400,
-        `Cash on Delivery requires a prepaid booking amount of Rs ${COD_ADVANCE_AMOUNT}.`,
-      );
-    }
     const prisma = await getPrisma();
     const canonicalTotals = await calculateCanonicalTotals(prisma, payload);
+    const normalizedMethod = normalizePaymentMethod(payload.paymentMethod);
 
     const order = await prisma.order.create({
       data: {
         number: createOrderNumber(),
-        status: OrderStatus.PAID,
+        status: normalizedMethod === "COD" ? OrderStatus.PENDING : OrderStatus.PAID,
         paymentMethod: payload.paymentMethod,
         totals: {
           ...canonicalTotals,
-          paidAmount: canonicalTotals.total,
-          paymentConfirmedAt: new Date().toISOString(),
+          paidAmount: normalizedMethod === "COD" ? 0 : canonicalTotals.total,
+          paymentConfirmedAt:
+            normalizedMethod === "COD" ? null : new Date().toISOString(),
         },
         shipping: payload.shipping,
         items: payload.items,
@@ -428,7 +451,7 @@ exports.createOrder = async (req, res, next) => {
 
 exports.createRazorpayOrder = async (req, res, next) => {
   try {
-    const creds = getRazorpayCreds();
+    const creds = razorpayService.getRazorpayCreds();
     if (!creds) {
       return sendError(res, 500, "Razorpay is not configured.");
     }
@@ -464,36 +487,16 @@ exports.createRazorpayOrder = async (req, res, next) => {
       notes.dueOnDelivery = String(canonicalTotals.dueOnDelivery);
     }
 
-    const response = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: {
-        Authorization: createRazorpayAuthorization(creds),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        amount,
-        currency,
-        receipt: payload.receipt || `rcpt_${Date.now()}`,
-        notes,
-      }),
+    const razorpayResult = await razorpayService.createOrder({
+      amount,
+      currency,
+      receipt: payload.receipt || `rcpt_${Date.now()}`,
+      notes,
     });
 
-    const text = await response.text();
-    const razorpayPayload = text ? JSON.parse(text) : {};
-
-    if (!response.ok) {
-      return sendError(
-        res,
-        502,
-        razorpayPayload?.error?.description ||
-          razorpayPayload?.message ||
-          "Unable to create Razorpay order.",
-      );
-    }
-
     return sendSuccess(res, {
-      keyId: creds.keyId,
-      order: razorpayPayload,
+      keyId: razorpayResult.keyId,
+      order: razorpayResult.order,
       pricing: canonicalTotals,
     });
   } catch (error) {
@@ -509,7 +512,7 @@ exports.createRazorpayOrder = async (req, res, next) => {
 
 exports.confirmRazorpayCheckout = async (req, res, next) => {
   try {
-    const creds = getRazorpayCreds();
+    const creds = razorpayService.getRazorpayCreds();
     if (!creds) {
       return sendError(res, 500, "Razorpay is not configured.");
     }
@@ -904,6 +907,72 @@ exports.createShiprocketShipment = async (req, res, next) => {
   }
 };
 
+exports.createCheckoutOrder = async (req, res, next) => {
+  try {
+    const payload = createCheckoutOrderSchema.parse(req.body || {});
+    const orderInput = payload.order;
+    const normalizedMethod = normalizePaymentMethod(orderInput.paymentMethod || "PREPAID");
+
+    if (normalizedMethod !== "COD") {
+      const creds = razorpayService.getRazorpayCreds();
+      if (!creds) {
+        return sendError(res, 500, "Razorpay is not configured.");
+      }
+      if (!payload.payment) {
+        return sendError(res, 400, "Razorpay payment details are required for prepaid orders.");
+      }
+
+      const isValid = verifyRazorpaySignature({
+        razorpayOrderId: payload.payment.razorpayOrderId,
+        razorpayPaymentId: payload.payment.razorpayPaymentId,
+        razorpaySignature: payload.payment.razorpaySignature,
+        keySecret: creds.keySecret,
+      });
+
+      if (!isValid) {
+        return sendError(res, 400, "Payment signature verification failed.");
+      }
+    }
+
+    const prisma = await getPrisma();
+    const canonicalTotals = await calculateCanonicalTotals(prisma, orderInput);
+    const isCod = normalizedMethod === "COD";
+
+    const created = await prisma.order.create({
+      data: {
+        number: createOrderNumber(),
+        status: isCod ? OrderStatus.PENDING : OrderStatus.PAID,
+        paymentMethod: isCod ? "COD" : "PREPAID",
+        totals: {
+          ...canonicalTotals,
+          paidAmount: isCod ? 0 : canonicalTotals.total,
+          paymentConfirmedAt: isCod ? null : new Date().toISOString(),
+        },
+        shipping: {
+          ...(orderInput.shipping || {}),
+          paymentGateway: isCod ? null : "RAZORPAY",
+          paymentId: payload.payment?.razorpayPaymentId || null,
+          paymentOrderId: payload.payment?.razorpayOrderId || null,
+          paymentCaptureType: isCod ? null : "FULL",
+        },
+        items: orderInput.items,
+        userId: req.user?.id,
+      },
+    });
+
+    const orderWithShipment = await tryProvisionShiprocketShipment(prisma, created);
+    return sendSuccess(res, sanitizeOrder(orderWithShipment), null, "Order created successfully.");
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, error.errors[0]?.message || "Invalid payload");
+    }
+    if (error?.status) {
+      return sendError(res, error.status, error.message || "Unable to create order.");
+    }
+    return next(error);
+  }
+};
+
 exports.refreshShiprocketTracking = async (req, res, next) => {
   try {
     const prisma = await getPrisma();
@@ -935,6 +1004,23 @@ exports.refreshShiprocketTracking = async (req, res, next) => {
   } catch (error) {
     if (error?.status) {
       return sendError(res, error.status, error.message || "Unable to refresh Shiprocket tracking.");
+    }
+    return next(error);
+  }
+};
+
+exports.trackShipmentByAwb = async (req, res, next) => {
+  try {
+    const awb = String(req.params?.awb || "").trim();
+    if (!awb) {
+      return sendError(res, 400, "AWB is required.");
+    }
+
+    const tracking = await shiprocketService.trackShipment({ awb });
+    return sendSuccess(res, tracking);
+  } catch (error) {
+    if (error?.status) {
+      return sendError(res, error.status, error.message || "Unable to fetch shipment tracking.");
     }
     return next(error);
   }

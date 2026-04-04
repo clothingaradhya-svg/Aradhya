@@ -350,7 +350,7 @@ const OrderDetailPage = () => {
                 <p className="font-semibold text-gray-900">{shipping.fullName || 'N/A'}</p>
                 <p>{shipping.address || '-'}</p>
                 <p>
-                  {shipping.city || ''} {shipping.postalCode || ''}
+                  {[shipping.city, shipping.state, shipping.postalCode].filter(Boolean).join(', ') || '-'}
                 </p>
                 {shipping.phone ? (
                   <div className="flex items-center gap-2 mt-3">
@@ -393,18 +393,26 @@ const OrderDetailPage = () => {
                       <p className="font-semibold text-gray-900">{shipping.estimatedDelivery}</p>
                     </div>
                   ) : null}
-                  {shipping.trackingUrl ? (
-                    <a
-                      href={shipping.trackingUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                  {shipping.trackingNumber ? (
+                    <Link
+                      to={`/track/${encodeURIComponent(shipping.trackingNumber)}`}
                       className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full text-sm font-semibold bg-black text-white hover:bg-gray-900"
                     >
                       Track Package
                       <ArrowLeft className="w-4 h-4 rotate-180" />
-                    </a>
+                    </Link>
                   ) : null}
                 </div>
+              </div>
+            ) : shipping.shiprocketProvisioningError ? (
+              <div className="bg-white rounded-2xl border border-amber-200 p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <Truck className="w-5 h-5 text-amber-600" />
+                  <h3 className="text-lg font-bold text-gray-900">Shipment Status</h3>
+                </div>
+                <p className="text-sm text-amber-700">
+                  {shipping.shiprocketProvisioningError}
+                </p>
               </div>
             ) : null}
           </div>

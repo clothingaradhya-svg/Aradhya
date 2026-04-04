@@ -872,6 +872,17 @@ export const confirmRazorpayCheckout = async (token, data) =>
     }),
   );
 
+export const createCheckoutOrder = async (token, data) =>
+  unwrap(
+    await requestWithAuth('/create-order', token, {
+      method: 'POST',
+      body: data,
+    }),
+  );
+
+export const fetchShipmentTracking = async (awb) =>
+  unwrap(await request(`/track/${encodeURIComponent(awb)}`));
+
 export const fetchFastrrConfig = async () =>
   unwrap(await request('/fastrr/config'));
 

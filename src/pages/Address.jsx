@@ -39,6 +39,7 @@ const sanitizeAddress = (value) => ({
   phone: String(value?.phone || '').trim(),
   address: String(value?.address || '').trim(),
   city: String(value?.city || '').trim(),
+  state: String(value?.state || '').trim(),
   postalCode: String(value?.postalCode || '').trim(),
   isDefault: Boolean(value?.isDefault),
 });
@@ -108,6 +109,7 @@ export default function Address() {
     if (!value.phone) return 'Please enter phone number.';
     if (!value.address) return 'Please enter address.';
     if (!value.city) return 'Please enter city.';
+    if (!value.state) return 'Please enter state.';
     if (!value.postalCode) return 'Please enter postal code.';
     return '';
   };
@@ -281,8 +283,14 @@ export default function Address() {
             <input
               value={form.city}
               onChange={(event) => handleFieldChange('city', event.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-black focus:outline-none md:col-span-2"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-black focus:outline-none"
               placeholder="City"
+            />
+            <input
+              value={form.state}
+              onChange={(event) => handleFieldChange('state', event.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-black focus:outline-none"
+              placeholder="State"
             />
             <textarea
               value={form.address}

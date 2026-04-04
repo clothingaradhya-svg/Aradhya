@@ -59,6 +59,7 @@ const buildAddressFingerprint = (address) => {
     normalizeToken(address.phone),
     normalizeToken(address.address),
     normalizeToken(address.city),
+    normalizeToken(address.state),
     normalizeToken(address.postalCode),
   ].join('|');
 };
@@ -74,6 +75,7 @@ export const upsertCheckoutAddress = (currentItems, addressInput) => {
     phone: String(addressInput?.phone || '').trim(),
     address: String(addressInput?.address || '').trim(),
     city: String(addressInput?.city || '').trim(),
+    state: String(addressInput?.state || '').trim(),
     postalCode: String(addressInput?.postalCode || '').trim(),
     isDefault: Boolean(addressInput?.isDefault),
     updatedAt: now,
@@ -107,6 +109,7 @@ export const getEmptyShippingAddress = (customer = null) => ({
   phone: '',
   address: '',
   city: '',
+  state: '',
   postalCode: '',
   isDefault: false,
 });
