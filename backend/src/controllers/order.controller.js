@@ -387,6 +387,9 @@ const tryProvisionShiprocketShipment = async (prisma, order) => {
         data: {
           shipping: {
             ...(order.shipping || {}),
+            ...(error?.shippingPatch && typeof error.shippingPatch === "object"
+              ? error.shippingPatch
+              : {}),
             shiprocketStatus: "Shipment Pending",
             shiprocketProvisioningError: error?.message || "Unable to create shipment.",
             shiprocketLastSyncedAt: new Date().toISOString(),
