@@ -343,6 +343,25 @@ const normalizeAssignedAwbResponse = (payload = {}) => {
   };
 };
 
+const normalizeOrderRecord = (entry = {}) => {
+  const shipment = Array.isArray(entry?.shipments) ? entry.shipments[0] || {} : {};
+
+  return {
+    shiprocketOrderId: entry?.id || null,
+    channelOrderId: entry?.channel_order_id || null,
+    status: entry?.status || null,
+    shipmentId: shipment?.id || null,
+    awbCode: shipment?.awb || null,
+    courierName: shipment?.courier || null,
+    pickupScheduledDate: shipment?.pickup_scheduled_date || null,
+    pickupTokenNumber: shipment?.pickup_token_number || null,
+    manifestGenerated: Array.isArray(entry?.activities)
+      ? entry.activities.includes("MANIFEST_GENERATED")
+      : false,
+    raw: entry,
+  };
+};
+
 const normalizePickupResponse = (payload = {}) => {
   const source = payload?.response || payload?.data || payload || {};
 
@@ -368,6 +387,22 @@ const normalizeManifestResponse = (payload = {}) => ({
   },
   raw: payload,
 });
+
+const searchOrders = async ({ search }) => {
+  const response = await requestWithAuth({
+    url: "/orders",
+    method: "GET",
+    params: compactObject({
+      search,
+      per_page: 20,
+      sort: "DESC",
+      sort_by: "id",
+    }),
+  });
+
+  const source = Array.isArray(response.data?.data) ? response.data.data : [];
+  return source.map(normalizeOrderRecord);
+};
 
 const normalizeTrackingActivities = (payload = {}) => {
   const trackingData = payload?.tracking_data || payload?.data || payload || {};
@@ -562,6 +597,7 @@ const generateManifest = async ({ shipmentId }) => {
 module.exports = {
   getAuthStatus,
   createOrder,
+  searchOrders,
   trackShipment,
   checkServiceability,
   assignAwb,

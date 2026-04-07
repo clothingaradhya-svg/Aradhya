@@ -167,6 +167,80 @@ const buildCreateOrderInput = (order = {}) => ({
   package: getPackagePayload(order),
 });
 
+const recoverExistingShiprocketShipment = async (order, shipping = {}) => {
+  const reference = getOrderReference(order);
+  const candidates = await shiprocketService.searchOrders({ search: reference });
+  const exactMatch = candidates.find(
+    (entry) => String(entry?.channelOrderId || "").trim() === reference,
+  );
+
+  if (!exactMatch) return null;
+
+  logShiprocket(`Recovered existing Shiprocket order for ${order?.number || order?.id}`, {
+    shiprocketOrderId: exactMatch.shiprocketOrderId,
+    shipmentId: exactMatch.shipmentId,
+    awbCode: exactMatch.awbCode,
+    status: exactMatch.status,
+  });
+
+  const shipment = {
+    summary: {
+      shiprocketOrderId:
+        String(exactMatch.shiprocketOrderId || "").trim() || null,
+      shipmentId: String(exactMatch.shipmentId || "").trim() || null,
+      awbCode: String(exactMatch.awbCode || "").trim() || null,
+      status: String(exactMatch.status || "").trim() || null,
+    },
+    raw: exactMatch.raw,
+  };
+
+  const assigned = exactMatch.awbCode
+    ? {
+        summary: {
+          shiprocketOrderId:
+            String(exactMatch.shiprocketOrderId || "").trim() || null,
+          shipmentId: String(exactMatch.shipmentId || "").trim() || null,
+          awbCode: String(exactMatch.awbCode || "").trim() || null,
+          courierName: String(exactMatch.courierName || "").trim() || null,
+          courierCompanyId: null,
+          status: "AWB Assigned",
+        },
+        raw: exactMatch.raw,
+      }
+    : null;
+
+  const pickup =
+    exactMatch.pickupScheduledDate || exactMatch.pickupTokenNumber
+      ? {
+          summary: {
+            pickupStatus: 1,
+            pickupScheduledDate: exactMatch.pickupScheduledDate || null,
+            pickupTokenNumber: exactMatch.pickupTokenNumber || null,
+            status: exactMatch.pickupScheduledDate ? "Pickup Requested" : null,
+          },
+          raw: exactMatch.raw,
+        }
+      : null;
+
+  const manifest = exactMatch.manifestGenerated
+    ? {
+        summary: {
+          status: 1,
+          manifestUrl: String(shipping?.shiprocketManifestUrl || shipping?.manifest_url || "").trim() || null,
+          message: "Manifest already generated",
+        },
+        raw: exactMatch.raw,
+      }
+    : null;
+
+  return {
+    shipment,
+    assigned,
+    pickup,
+    manifest,
+  };
+};
+
 const normalizeServiceabilityResponse = (payload) => payload?.data || payload || {};
 
 const parseEtdScore = (value) => {
@@ -389,6 +463,22 @@ const createShiprocketShipmentForOrder = async (order, { allowExisting = false }
   let partialPatch = buildShipmentPatch(shipping, { shipment });
 
   try {
+    if (!shipment && !existingRefs.shiprocketOrderId) {
+      const recovered = await recoverExistingShiprocketShipment(order, shipping);
+      if (recovered?.shipment) {
+        shipment = recovered.shipment;
+        assigned = recovered.assigned;
+        pickup = recovered.pickup;
+        manifest = recovered.manifest;
+        partialPatch = buildShipmentPatch(shipping, {
+          shipment,
+          assigned,
+          pickup,
+          manifest,
+        });
+      }
+    }
+
     if (!shipment) {
       shipment = await shiprocketService.createOrder(input);
       logShiprocket(`Order created for ${order?.number || order?.id}`, shipment?.summary || null);
