@@ -18,6 +18,7 @@ const env = {
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
   cloudinaryFolder: process.env.CLOUDINARY_FOLDER || 'marvelle',
+  shiprocketToken: process.env.SHIPROCKET_TOKEN,
   shiprocketEmail: process.env.SHIPROCKET_EMAIL,
   shiprocketPassword: process.env.SHIPROCKET_PASSWORD,
   shiprocketPickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || 'Rik Sama',

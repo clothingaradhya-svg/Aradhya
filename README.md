@@ -38,8 +38,9 @@ Create the frontend env file by copying `.env.example` to `.env`.
 
 Create the backend env file by copying `backend/.env.example` to `backend/.env`.
 
-Then update `backend/.env` with your Shiprocket API user credentials:
+Then update `backend/.env` with either a Shiprocket bearer token from Postman or your Shiprocket API user credentials:
 
+- `SHIPROCKET_TOKEN`
 - `SHIPROCKET_EMAIL`
 - `SHIPROCKET_PASSWORD`
 - `SHIPROCKET_PICKUP_LOCATION`
@@ -47,6 +48,9 @@ Then update `backend/.env` with your Shiprocket API user credentials:
 
 Important:
 
+- If you already have a working bearer token from `POST /v1/external/auth/login`, you can paste it into `SHIPROCKET_TOKEN`.
+- If you leave `SHIPROCKET_TOKEN` empty, the backend will log in with `SHIPROCKET_EMAIL` and `SHIPROCKET_PASSWORD`.
+- If you set both, the backend will use the pasted token first and fall back to logging in again when that token expires or Shiprocket rejects it.
 - Use your Shiprocket API user email/password, not your normal dashboard login.
 - The Shiprocket pickup location must already exist in your Shiprocket account.
 

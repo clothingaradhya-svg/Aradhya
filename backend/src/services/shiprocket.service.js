@@ -20,6 +20,7 @@ let tokenCache = {
   expiresAt: 0,
   refreshedAt: 0,
   refreshPromise: null,
+  source: null,
 };
 
 const createAppError = (message, status = 500, details = null) => {
@@ -36,10 +37,15 @@ const compactObject = (value = {}) =>
     ),
   );
 
+const hasStaticToken = () => Boolean(String(env.shiprocketToken || "").trim());
+
+const hasCredentialPair = () =>
+  Boolean(String(env.shiprocketEmail || "").trim() && String(env.shiprocketPassword || "").trim());
+
 const ensureShiprocketCredentials = () => {
-  if (env.shiprocketEmail && env.shiprocketPassword) return;
+  if (hasStaticToken() || hasCredentialPair()) return;
   throw createAppError(
-    "Shiprocket credentials are missing. Add SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD in backend/.env.",
+    "Shiprocket credentials are missing. Add SHIPROCKET_TOKEN or SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD in backend/.env.",
     500,
   );
 };
@@ -86,6 +92,21 @@ const decodeJwtExpiry = (token) => {
   }
 };
 
+const hydrateTokenCache = (token, source) => {
+  const trimmedToken = String(token || "").trim();
+  const expiresAt = decodeJwtExpiry(trimmedToken) || Date.now() + SHIPROCKET_TOKEN_TTL_MS;
+
+  tokenCache = {
+    token: trimmedToken,
+    expiresAt,
+    refreshedAt: Date.now(),
+    refreshPromise: null,
+    source,
+  };
+
+  return tokenCache;
+};
+
 const hasFreshToken = () =>
   Boolean(tokenCache.token) &&
   Number.isFinite(tokenCache.expiresAt) &&
@@ -117,11 +138,38 @@ const mapShiprocketError = (error, fallbackMessage = "Shiprocket request failed.
 const authenticate = async ({ forceRefresh = false } = {}) => {
   ensureShiprocketCredentials();
 
+  if (hasStaticToken()) {
+    const configuredToken = String(env.shiprocketToken || "").trim();
+    const configuredExpiry = decodeJwtExpiry(configuredToken);
+    const staticTokenExpired =
+      Number.isFinite(configuredExpiry) &&
+      Date.now() >= configuredExpiry - TOKEN_REFRESH_BUFFER_MS;
+    const configuredTokenChanged = tokenCache.token !== configuredToken;
+
+    if (!forceRefresh && !staticTokenExpired) {
+      if (configuredTokenChanged || !hasFreshToken() || tokenCache.source !== "static-token") {
+        return hydrateTokenCache(configuredToken, "static-token");
+      }
+
+      return {
+        token: tokenCache.token,
+        expiresAt: tokenCache.expiresAt,
+        refreshedAt: tokenCache.refreshedAt,
+        source: tokenCache.source,
+      };
+    }
+
+    if (!hasCredentialPair()) {
+      return hydrateTokenCache(configuredToken, "static-token");
+    }
+  }
+
   if (!forceRefresh && hasFreshToken()) {
     return {
       token: tokenCache.token,
       expiresAt: tokenCache.expiresAt,
       refreshedAt: tokenCache.refreshedAt,
+      source: tokenCache.source,
     };
   }
 
@@ -131,6 +179,7 @@ const authenticate = async ({ forceRefresh = false } = {}) => {
       token: tokenCache.token,
       expiresAt: tokenCache.expiresAt,
       refreshedAt: tokenCache.refreshedAt,
+      source: tokenCache.source,
     };
   }
 
@@ -149,12 +198,7 @@ const authenticate = async ({ forceRefresh = false } = {}) => {
         );
       }
 
-      tokenCache = {
-        token,
-        expiresAt: decodeJwtExpiry(token) || Date.now() + SHIPROCKET_TOKEN_TTL_MS,
-        refreshedAt: Date.now(),
-        refreshPromise: null,
-      };
+      hydrateTokenCache(token, "login");
 
       return tokenCache;
     })
@@ -164,6 +208,7 @@ const authenticate = async ({ forceRefresh = false } = {}) => {
         expiresAt: 0,
         refreshedAt: 0,
         refreshPromise: null,
+        source: null,
       };
       throw mapShiprocketError(error, "Shiprocket authentication failed.");
     })
@@ -178,6 +223,7 @@ const authenticate = async ({ forceRefresh = false } = {}) => {
     token: tokenCache.token,
     expiresAt: tokenCache.expiresAt,
     refreshedAt: tokenCache.refreshedAt,
+    source: tokenCache.source,
   };
 };
 
@@ -375,6 +421,7 @@ const getAuthStatus = async () => {
     authenticated: Boolean(auth.token),
     expiresAt: auth.expiresAt,
     refreshedAt: auth.refreshedAt,
+    source: auth.source,
     pickupLocation: env.shiprocketPickupLocation,
   };
 };
