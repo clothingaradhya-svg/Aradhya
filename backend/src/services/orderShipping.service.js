@@ -58,6 +58,10 @@ const getExistingShiprocketRefs = (shipping = {}) => ({
   shiprocketStatus: String(
     shipping?.shiprocketStatus || shipping?.shipment_status || shipping?.shipmentStatus || "",
   ).trim(),
+  pickupStatus: String(
+    shipping?.shiprocketPickupStatus || shipping?.pickup_status || shipping?.pickupStatus || "",
+  ).trim(),
+  manifestUrl: String(shipping?.shiprocketManifestUrl || shipping?.manifest_url || "").trim(),
 });
 
 const hasExistingShipment = (shipping = {}) => {
@@ -241,6 +245,8 @@ const buildTrackingUrl = (awbCode) => {
 const buildShipmentPatch = (shipping = {}, context = {}) => {
   const shipment = context.shipment || {};
   const assigned = context.assigned || {};
+  const pickup = context.pickup || {};
+  const manifest = context.manifest || {};
   const tracking = context.tracking || {};
   const courier = context.courier || {};
   const fallbackRefs = getExistingShiprocketRefs(shipping);
@@ -282,6 +288,16 @@ const buildShipmentPatch = (shipping = {}, context = {}) => {
         fallbackRefs.shiprocketStatus ||
         (awbCode ? "AWB Assigned" : shipmentId ? "NEW" : ""),
     ).trim() || null;
+  const pickupSummary = pickup?.summary || {};
+  const manifestSummary = manifest?.summary || {};
+  const pickupStatus =
+    String(
+      pickupSummary.pickupStatus ??
+        pickupSummary.status ??
+        fallbackRefs.pickupStatus,
+    ).trim() || null;
+  const manifestUrl =
+    String(manifestSummary.manifestUrl || fallbackRefs.manifestUrl || "").trim() || null;
 
   return compactObject({
     ...shipping,
@@ -308,6 +324,18 @@ const buildShipmentPatch = (shipping = {}, context = {}) => {
     shiprocketStatus: shipmentStatus,
     shipmentStatus,
     shipment_status: shipmentStatus,
+    shiprocketPickupStatus: pickupStatus,
+    pickupStatus,
+    pickup_status: pickupStatus,
+    shiprocketPickupTokenNumber:
+      String(pickupSummary.pickupTokenNumber || shipping.shiprocketPickupTokenNumber || "").trim() ||
+      null,
+    shiprocketPickupScheduledDate:
+      String(
+        pickupSummary.pickupScheduledDate || shipping.shiprocketPickupScheduledDate || "",
+      ).trim() || null,
+    shiprocketManifestUrl: manifestUrl,
+    manifest_url: manifestUrl,
     shiprocketLastSyncedAt: new Date().toISOString(),
     shiprocketProvisioningError: null,
     source: "SHIPROCKET",
@@ -355,6 +383,8 @@ const createShiprocketShipmentForOrder = async (order, { allowExisting = false }
     : null;
   let courier = null;
   let assigned = null;
+  let pickup = null;
+  let manifest = null;
   let tracking = null;
   let partialPatch = buildShipmentPatch(shipping, { shipment });
 
@@ -425,6 +455,39 @@ const createShiprocketShipmentForOrder = async (order, { allowExisting = false }
       logShiprocket(`AWB generation result for ${order?.number || order?.id}`, assigned?.summary || null);
     }
 
+    const currentPatchAfterAwb = buildShipmentPatch(shipping, {
+      shipment,
+      assigned,
+      courier,
+    });
+    const pickupAlreadyRequested = Boolean(
+      String(existingRefs.pickupStatus || "").trim() &&
+        String(existingRefs.pickupStatus || "").trim() !== "0",
+    );
+
+    if (pickupAlreadyRequested) {
+      logShiprocket(`Skipping pickup request for ${order?.number || order?.id}; pickup already exists`, {
+        pickupStatus: existingRefs.pickupStatus,
+      });
+    } else {
+      pickup = await shiprocketService.generatePickup({
+        shipmentId,
+      });
+      logShiprocket(`Pickup generation result for ${order?.number || order?.id}`, pickup?.summary || null);
+    }
+
+    const manifestAlreadyGenerated = Boolean(existingRefs.manifestUrl);
+    if (manifestAlreadyGenerated) {
+      logShiprocket(`Skipping manifest generation for ${order?.number || order?.id}; manifest already exists`, {
+        manifestUrl: existingRefs.manifestUrl,
+      });
+    } else {
+      manifest = await shiprocketService.generateManifest({
+        shipmentId,
+      });
+      logShiprocket(`Manifest generation result for ${order?.number || order?.id}`, manifest?.summary || null);
+    }
+
     const awbCode =
       String(
         assigned?.summary?.awbCode || shipment?.summary?.awbCode || existingRefs.awbCode || "",
@@ -449,6 +512,8 @@ const createShiprocketShipmentForOrder = async (order, { allowExisting = false }
     const shippingPatch = buildShipmentPatch(shipping, {
       shipment,
       assigned,
+      pickup,
+      manifest,
       tracking,
       courier,
     });
@@ -458,6 +523,8 @@ const createShiprocketShipmentForOrder = async (order, { allowExisting = false }
       alreadyExists: false,
       shipment,
       assigned,
+      pickup,
+      manifest,
       tracking,
       courier,
       shippingPatch,
@@ -466,6 +533,8 @@ const createShiprocketShipmentForOrder = async (order, { allowExisting = false }
     partialPatch = buildShipmentPatch(shipping, {
       shipment,
       assigned,
+      pickup,
+      manifest,
       tracking,
       courier,
     });

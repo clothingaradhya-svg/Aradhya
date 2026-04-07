@@ -343,6 +343,32 @@ const normalizeAssignedAwbResponse = (payload = {}) => {
   };
 };
 
+const normalizePickupResponse = (payload = {}) => {
+  const source = payload?.response || payload?.data || payload || {};
+
+  return {
+    summary: {
+      pickupStatus: Number(payload?.pickup_status ?? source?.pickup_status ?? 0) || 0,
+      pickupScheduledDate:
+        source?.pickup_scheduled_date || source?.pickup_date || payload?.pickup_scheduled_date || null,
+      pickupTokenNumber:
+        source?.pickup_token_number || payload?.pickup_token_number || null,
+      status: source?.status ?? payload?.status ?? null,
+      message: source?.data || payload?.message || null,
+    },
+    raw: payload,
+  };
+};
+
+const normalizeManifestResponse = (payload = {}) => ({
+  summary: {
+    status: Number(payload?.status ?? 0) || 0,
+    manifestUrl: payload?.manifest_url || null,
+    message: payload?.message || null,
+  },
+  raw: payload,
+});
+
 const normalizeTrackingActivities = (payload = {}) => {
   const trackingData = payload?.tracking_data || payload?.data || payload || {};
   const activitiesSource = Array.isArray(trackingData?.shipment_track_activities)
@@ -507,10 +533,38 @@ const assignAwb = async ({ shipmentId, courierId, status }) => {
   return normalizeAssignedAwbResponse(response.data);
 };
 
+const generatePickup = async ({ shipmentId, status, pickupDate }) => {
+  const response = await requestWithAuth({
+    url: "/courier/generate/pickup",
+    method: "POST",
+    data: compactObject({
+      shipment_id: [Number(shipmentId)],
+      status,
+      pickup_date: pickupDate ? [pickupDate] : undefined,
+    }),
+  });
+
+  return normalizePickupResponse(response.data);
+};
+
+const generateManifest = async ({ shipmentId }) => {
+  const response = await requestWithAuth({
+    url: "/manifests/generate",
+    method: "POST",
+    data: {
+      shipment_id: [Number(shipmentId)],
+    },
+  });
+
+  return normalizeManifestResponse(response.data);
+};
+
 module.exports = {
   getAuthStatus,
   createOrder,
   trackShipment,
   checkServiceability,
   assignAwb,
+  generatePickup,
+  generateManifest,
 };
