@@ -27,6 +27,9 @@ const toPositiveNumber = (value, fallback) => {
 
 const normalizeToken = (value) => String(value ?? "").trim().toUpperCase();
 
+const normalizePaymentToken = (value) =>
+  normalizeToken(value).replace(/[\s_-]+/g, "");
+
 const stripNonDigits = (value) => String(value ?? "").replace(/\D+/g, "");
 
 const logShiprocket = (label, payload) => {
@@ -71,7 +74,12 @@ const hasExistingShipment = (shipping = {}) => {
 
 const hasAssignedAwb = (shipping = {}) => Boolean(getExistingShiprocketRefs(shipping).awbCode);
 
-const isCodOrder = (order = {}) => normalizeToken(order?.paymentMethod) === "COD";
+const isCodPaymentMethod = (value) => {
+  const normalized = normalizePaymentToken(value);
+  return normalized === "COD" || normalized === "CASHONDELIVERY";
+};
+
+const isCodOrder = (order = {}) => isCodPaymentMethod(order?.paymentMethod);
 
 const shouldCreateShipmentForOrder = (order = {}) => {
   if (!order) return false;
@@ -316,6 +324,18 @@ const buildTrackingUrl = (awbCode) => {
   return `${frontendBase}/track/${encodeURIComponent(awb)}`;
 };
 
+const buildExistingShipmentSummary = (refs = {}) => ({
+  summary: {
+    shiprocketOrderId: refs.shiprocketOrderId || null,
+    shipmentId: refs.shipmentId || null,
+    awbCode: refs.awbCode || null,
+    status:
+      refs.shiprocketStatus ||
+      (refs.awbCode ? "AWB Assigned" : refs.shipmentId ? "NEW" : refs.shiprocketOrderId ? "Order Synced" : null),
+  },
+  raw: null,
+});
+
 const buildShipmentPatch = (shipping = {}, context = {}) => {
   const shipment = context.shipment || {};
   const assigned = context.assigned || {};
@@ -414,6 +434,94 @@ const buildShipmentPatch = (shipping = {}, context = {}) => {
     shiprocketProvisioningError: null,
     source: "SHIPROCKET",
   });
+};
+
+const ensureShiprocketOrderForOrder = async (order, { allowExisting = false } = {}) => {
+  const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
+  const existingRefs = getExistingShiprocketRefs(shipping);
+  const hasExistingRefs = Boolean(
+    existingRefs.shiprocketOrderId || existingRefs.shipmentId || existingRefs.awbCode,
+  );
+
+  if (hasExistingRefs && !allowExisting) {
+    const shipment = buildExistingShipmentSummary(existingRefs);
+
+    return {
+      created: false,
+      alreadyExists: true,
+      shipment,
+      shippingPatch: buildShipmentPatch(shipping, { shipment }),
+    };
+  }
+
+  if (!shouldCreateShipmentForOrder(order) && !allowExisting) {
+    throw createAppError(
+      "This order is not ready for Shiprocket yet. Create the Shiprocket order after payment success or for a COD order.",
+      400,
+    );
+  }
+
+  if (existingRefs.shipmentId) {
+    const shipment = buildExistingShipmentSummary(existingRefs);
+
+    return {
+      created: false,
+      alreadyExists: true,
+      shipment,
+      shippingPatch: buildShipmentPatch(shipping, { shipment }),
+    };
+  }
+
+  const recovered = await recoverExistingShiprocketShipment(order, shipping);
+  if (recovered?.shipment) {
+    return {
+      created: false,
+      alreadyExists: true,
+      shipment: recovered.shipment,
+      assigned: recovered.assigned || null,
+      pickup: recovered.pickup || null,
+      manifest: recovered.manifest || null,
+      shippingPatch: buildShipmentPatch(shipping, recovered),
+    };
+  }
+
+  const input = buildCreateOrderInput(order);
+
+  try {
+    const shipment = await shiprocketService.createOrder(input);
+    logShiprocket(`Shiprocket order synced for ${order?.number || order?.id}`, shipment?.summary || null);
+
+    return {
+      created: true,
+      alreadyExists: false,
+      shipment,
+      shippingPatch: buildShipmentPatch(shipping, { shipment }),
+    };
+  } catch (error) {
+    const recoveredAfterFailure = await recoverExistingShiprocketShipment(order, shipping).catch(
+      () => null,
+    );
+
+    if (recoveredAfterFailure?.shipment) {
+      logShiprocket(
+        `Recovered Shiprocket order after create failure for ${order?.number || order?.id}`,
+        recoveredAfterFailure.shipment?.summary || null,
+      );
+
+      return {
+        created: false,
+        alreadyExists: true,
+        shipment: recoveredAfterFailure.shipment,
+        assigned: recoveredAfterFailure.assigned || null,
+        pickup: recoveredAfterFailure.pickup || null,
+        manifest: recoveredAfterFailure.manifest || null,
+        shippingPatch: buildShipmentPatch(shipping, recoveredAfterFailure),
+      };
+    }
+
+    const shipment = hasExistingRefs ? buildExistingShipmentSummary(existingRefs) : null;
+    throw withShippingPatch(error, buildShipmentPatch(shipping, { shipment }));
+  }
 };
 
 const createShiprocketShipmentForOrder = async (order, { allowExisting = false } = {}) => {
@@ -660,6 +768,7 @@ module.exports = {
   hasExistingShipment,
   isCodOrder,
   shouldCreateShipmentForOrder,
+  ensureShiprocketOrderForOrder,
   createShiprocketShipmentForOrder,
   refreshShiprocketTrackingForOrder,
 };

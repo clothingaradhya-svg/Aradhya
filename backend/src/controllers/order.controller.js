@@ -216,6 +216,20 @@ const normalizePaymentMethod = (value = "") =>
     .trim()
     .toUpperCase();
 
+const normalizePaymentMethodToken = (value = "") =>
+  normalizePaymentMethod(value).replace(/[\s_-]+/g, "");
+
+const isCodPaymentMethod = (value = "") => {
+  const token = normalizePaymentMethodToken(value);
+  return token === "COD" || token === "CASHONDELIVERY";
+};
+
+const getStoredPaymentMethod = (value = "") => {
+  if (isCodPaymentMethod(value)) return "COD";
+  const normalized = normalizePaymentMethod(value);
+  return normalized || "PREPAID";
+};
+
 const calculateSubtotalFromItems = (items = []) =>
   roundMoney(
     (Array.isArray(items) ? items : []).reduce((sum, item) => {
@@ -231,7 +245,7 @@ const calculatePaymentFee = (paymentMethod) =>
   toMoney(PAYMENT_FEES[normalizePaymentMethod(paymentMethod)] || 0, 0);
 
 const getPaymentBreakdown = (paymentMethod, total) => {
-  const normalizedMethod = normalizePaymentMethod(paymentMethod);
+  const normalizedMethod = isCodPaymentMethod(paymentMethod) ? "COD" : normalizePaymentMethod(paymentMethod);
   const normalizedTotal = roundMoney(Math.max(toMoney(total, 0), 0));
 
   if (normalizedMethod === "COD") {
@@ -367,7 +381,7 @@ const tryProvisionShiprocketShipment = async (prisma, order) => {
   }
 
   try {
-    const result = await orderShippingService.createShiprocketShipmentForOrder(order);
+    const result = await orderShippingService.ensureShiprocketOrderForOrder(order);
     if (!result?.shippingPatch) return order;
 
     return prisma.order.update({
@@ -407,13 +421,14 @@ exports.createOrder = async (req, res, next) => {
     const payload = createOrderSchema.parse(req.body);
     const prisma = await getPrisma();
     const canonicalTotals = await calculateCanonicalTotals(prisma, payload);
-    const normalizedMethod = normalizePaymentMethod(payload.paymentMethod);
+    const normalizedMethod = isCodPaymentMethod(payload.paymentMethod) ? "COD" : normalizePaymentMethod(payload.paymentMethod);
+    const storedPaymentMethod = getStoredPaymentMethod(payload.paymentMethod);
 
     const order = await prisma.order.create({
       data: {
         number: createOrderNumber(),
         status: normalizedMethod === "COD" ? OrderStatus.PENDING : OrderStatus.PAID,
-        paymentMethod: payload.paymentMethod,
+        paymentMethod: storedPaymentMethod,
         totals: {
           ...canonicalTotals,
           paidAmount: normalizedMethod === "COD" ? 0 : canonicalTotals.total,
@@ -536,14 +551,14 @@ exports.confirmRazorpayCheckout = async (req, res, next) => {
 
     const prisma = await getPrisma();
     const canonicalTotals = await calculateCanonicalTotals(prisma, order);
-    const normalizedMethod = normalizePaymentMethod(order.paymentMethod);
+    const normalizedMethod = isCodPaymentMethod(order.paymentMethod) ? "COD" : normalizePaymentMethod(order.paymentMethod);
     const paidAmount =
       normalizedMethod === "COD" ? canonicalTotals.payableNow : canonicalTotals.total;
     const created = await prisma.order.create({
       data: {
         number: createOrderNumber(),
         status: normalizedMethod === "COD" ? OrderStatus.PENDING : OrderStatus.PAID,
-        paymentMethod: order.paymentMethod || "RAZORPAY",
+        paymentMethod: normalizedMethod === "COD" ? "COD" : getStoredPaymentMethod(order.paymentMethod || "RAZORPAY"),
         totals: {
           ...canonicalTotals,
           paidAmount,
@@ -858,7 +873,9 @@ exports.updateOrder = async (req, res, next) => {
         shipping: nextShipping,
       },
     });
-    return sendSuccess(res, sanitizeOrder(order));
+
+    const orderWithShipment = await tryProvisionShiprocketShipment(prisma, order);
+    return sendSuccess(res, sanitizeOrder(orderWithShipment));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, 400, error.errors[0]?.message || "Invalid payload");
