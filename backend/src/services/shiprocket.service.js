@@ -37,6 +37,13 @@ const compactObject = (value = {}) =>
     ),
   );
 
+const normalizeLookupToken = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
 const hasStaticToken = () => Boolean(String(env.shiprocketToken || "").trim());
 
 const hasCredentialPair = () =>
@@ -296,7 +303,7 @@ const buildCreateOrderPayload = (input) => {
   return {
     order_id: input.orderId || `WEB-${Date.now()}`,
     order_date: formatShiprocketDate(input.orderDate),
-    pickup_location: input.pickupLocation || env.shiprocketPickupLocation,
+    pickup_location: input.pickupLocation || env.shiprocketPickupLocation || undefined,
     comment: input.notes || undefined,
     billing_customer_name: firstName,
     billing_last_name: lastName || undefined,
@@ -320,6 +327,119 @@ const buildCreateOrderPayload = (input) => {
     breadth: toNumber(packageDetails.breadth, env.shiprocketDefaultBreadth),
     height: toNumber(packageDetails.height, env.shiprocketDefaultHeight),
     weight: toNumber(packageDetails.weight, env.shiprocketDefaultWeight),
+  };
+};
+
+const getPickupLocationEntries = async () => {
+  const response = await requestWithAuth({
+    url: "/settings/company/pickup",
+    method: "GET",
+  });
+
+  const data = response.data?.data || response.data || {};
+  const rawEntries = Array.isArray(data?.shipping_address)
+    ? data.shipping_address
+    : Array.isArray(data)
+      ? data
+      : [];
+
+  return rawEntries
+    .map((entry) => ({
+      pickupLocation:
+        String(entry?.pickup_location || entry?.pickupLocation || entry?.warehouse_name || "")
+          .trim() || null,
+      addressId: entry?.id || entry?.pickup_address_id || null,
+      isDefault: Boolean(entry?.is_default || entry?.default || entry?.pickup_default),
+      raw: entry,
+    }))
+    .filter((entry) => entry.pickupLocation);
+};
+
+const resolvePickupLocation = async (requestedPickupLocation) => {
+  const requested = String(requestedPickupLocation || "").trim();
+  if (!requested) {
+    return {
+      pickupLocation: null,
+      source: "default",
+    };
+  }
+
+  const entries = await getPickupLocationEntries();
+  if (!entries.length) {
+    return {
+      pickupLocation: null,
+      source: "default",
+    };
+  }
+
+  const requestedToken = normalizeLookupToken(requested);
+  const exactMatch = entries.find(
+    (entry) => normalizeLookupToken(entry.pickupLocation) === requestedToken,
+  );
+  if (exactMatch) {
+    return {
+      pickupLocation: exactMatch.pickupLocation,
+      source: "exact",
+    };
+  }
+
+  const partialMatch = entries.find((entry) => {
+    const entryToken = normalizeLookupToken(entry.pickupLocation);
+    return (
+      entryToken.includes(requestedToken) ||
+      requestedToken.includes(entryToken)
+    );
+  });
+  if (partialMatch) {
+    return {
+      pickupLocation: partialMatch.pickupLocation,
+      source: "partial",
+    };
+  }
+
+  const defaultEntry = entries.find((entry) => entry.isDefault) || entries[0];
+  return {
+    pickupLocation: defaultEntry?.pickupLocation || null,
+    source: defaultEntry?.isDefault ? "default" : "first",
+  };
+};
+
+const isPickupLocationError = (error) => {
+  const haystack = [
+    error?.message,
+    typeof error?.details === "string" ? error.details : null,
+    Array.isArray(error?.details) ? error.details.join(" ") : null,
+    typeof error?.details === "object" ? JSON.stringify(error.details) : null,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes("pickup");
+};
+
+const createOrderRequest = async (payload) => {
+  const response = await requestWithAuth({
+    url: "/orders/create/adhoc",
+    method: "POST",
+    data: compactObject(payload),
+  });
+
+  return {
+    summary: {
+      localOrderId: payload.order_id,
+      shiprocketOrderId:
+        response.data?.order_id || response.data?.orderId || response.data?.data?.order_id || null,
+      shipmentId:
+        response.data?.shipment_id ||
+        response.data?.shipmentId ||
+        response.data?.data?.shipment_id ||
+        null,
+      awbCode: response.data?.awb_code || response.data?.data?.awb_code || null,
+      status: response.data?.status || response.data?.message || "Order created",
+      pickupLocation: payload.pickup_location || null,
+    },
+    raw: response.data,
   };
 };
 
@@ -489,28 +609,27 @@ const getAuthStatus = async () => {
 
 const createOrder = async (input) => {
   const payload = buildCreateOrderPayload(input);
-  const response = await requestWithAuth({
-    url: "/orders/create/adhoc",
-    method: "POST",
-    data: payload,
-  });
+  try {
+    return await createOrderRequest(payload);
+  } catch (error) {
+    if (!isPickupLocationError(error)) {
+      throw error;
+    }
 
-  return {
-    summary: {
-      localOrderId: payload.order_id,
-      shiprocketOrderId:
-        response.data?.order_id || response.data?.orderId || response.data?.data?.order_id || null,
-      shipmentId:
-        response.data?.shipment_id ||
-        response.data?.shipmentId ||
-        response.data?.data?.shipment_id ||
-        null,
-      awbCode: response.data?.awb_code || response.data?.data?.awb_code || null,
-      status: response.data?.status || response.data?.message || "Order created",
-      pickupLocation: payload.pickup_location,
-    },
-    raw: response.data,
-  };
+    const resolvedPickup = await resolvePickupLocation(payload.pickup_location).catch(
+      () => ({
+        pickupLocation: null,
+        source: "default",
+      }),
+    );
+
+    const retryPayload = {
+      ...payload,
+      pickup_location: resolvedPickup.pickupLocation || undefined,
+    };
+
+    return createOrderRequest(retryPayload);
+  }
 };
 
 const trackShipment = async ({ awb, orderId }) => {

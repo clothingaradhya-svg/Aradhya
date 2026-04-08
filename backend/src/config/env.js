@@ -21,7 +21,7 @@ const env = {
   shiprocketToken: process.env.SHIPROCKET_TOKEN,
   shiprocketEmail: process.env.SHIPROCKET_EMAIL,
   shiprocketPassword: process.env.SHIPROCKET_PASSWORD,
-  shiprocketPickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || 'Rik Sama',
+  shiprocketPickupLocation: String(process.env.SHIPROCKET_PICKUP_LOCATION || '').trim(),
   shiprocketPickupPincode: process.env.SHIPROCKET_PICKUP_PINCODE || '711403',
   shiprocketDefaultCountry: process.env.SHIPROCKET_DEFAULT_COUNTRY || 'India',
   shiprocketDefaultWeight: toNumber(process.env.SHIPROCKET_DEFAULT_WEIGHT, 0.5),
