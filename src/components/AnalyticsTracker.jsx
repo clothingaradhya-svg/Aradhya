@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   getAnalyticsMeasurementId,
@@ -8,6 +8,7 @@ import {
 
 const AnalyticsTracker = () => {
   const { pathname, search } = useLocation();
+  const hasTrackedInitialPage = useRef(false);
 
   useEffect(() => {
     if (!getAnalyticsMeasurementId()) {
@@ -15,6 +16,13 @@ const AnalyticsTracker = () => {
     }
 
     initializeAnalytics();
+
+    // The initial page view is handled by the head-level GA config tag.
+    if (!hasTrackedInitialPage.current) {
+      hasTrackedInitialPage.current = true;
+      return;
+    }
+
     trackPageView({ pathname, search });
   }, [pathname, search]);
 

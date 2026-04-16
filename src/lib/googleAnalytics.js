@@ -37,7 +37,7 @@ export function initializeAnalytics() {
     script.dataset.gaId = measurementId;
     document.head.appendChild(script);
     window.gtag('js', new Date());
-    window.gtag('config', measurementId, { send_page_view: false });
+    window.gtag('config', measurementId);
   }
 
   initialized = true;
