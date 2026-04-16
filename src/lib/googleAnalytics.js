@@ -28,17 +28,17 @@ export function initializeAnalytics() {
     return false;
   }
 
-  if (!document.querySelector(`script[data-ga-id="${measurementId}"]`)) {
+  window.gtag = window.gtag || gtag;
+
+  if (!document.querySelector(`script[src*="googletagmanager.com/gtag/js?id=${measurementId}"]`)) {
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
     script.dataset.gaId = measurementId;
     document.head.appendChild(script);
+    window.gtag('js', new Date());
+    window.gtag('config', measurementId, { send_page_view: false });
   }
-
-  window.gtag = window.gtag || gtag;
-  window.gtag('js', new Date());
-  window.gtag('config', measurementId, { send_page_view: false });
 
   initialized = true;
   return true;
