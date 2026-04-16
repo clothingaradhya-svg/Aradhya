@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import { AuthProvider } from './contexts/auth-context';
 import { AdminProvider } from './contexts/admin-auth-context';
 import Layout from './components/Layout';
+import AnalyticsTracker from './components/AnalyticsTracker';
 import ScrollToTop from './components/ScrollToTop';
 import HomePage from './pages/HomePage';
 import ProductDetails from './pages/ProductDetails';
@@ -44,6 +45,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AnalyticsTracker />
         <ScrollToTop />
         <Routes>
           <Route
