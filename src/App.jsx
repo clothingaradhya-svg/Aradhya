@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/auth-context';
 import { AdminProvider } from './contexts/admin-auth-context';
 import Layout from './components/Layout';
 import AnalyticsTracker from './components/AnalyticsTracker';
+import MetaAdvancedMatchingTracker from './components/MetaAdvancedMatchingTracker';
 import ScrollToTop from './components/ScrollToTop';
 import HomePage from './pages/HomePage';
 import ProductDetails from './pages/ProductDetails';
@@ -46,6 +47,7 @@ export default function App() {
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AnalyticsTracker />
+        <MetaAdvancedMatchingTracker />
         <ScrollToTop />
         <Routes>
           <Route

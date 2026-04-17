@@ -2,8 +2,10 @@ const FLUSH_INTERVAL_MS = 250;
 const MAX_FLUSH_ATTEMPTS = 20;
 const PURCHASE_STORAGE_KEY = 'aradhya-meta-pixel-purchases-v1';
 const MAX_STORED_PURCHASE_IDS = 50;
+const PIXEL_ID = '839123811919855';
 
 let lastTrackedPath = null;
+let lastAdvancedMatchingSignature = null;
 
 function canUseMetaPixel() {
   return typeof window !== 'undefined' && typeof document !== 'undefined';
@@ -94,6 +96,21 @@ function sendMetaPixelEvent(...args) {
 function normalizeString(value) {
   const normalized = String(value ?? '').trim();
   return normalized || null;
+}
+
+function normalizeEmail(value) {
+  const normalized = normalizeString(value);
+  return normalized ? normalized.toLowerCase() : null;
+}
+
+function normalizePhone(value) {
+  const normalized = normalizeString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const digitsOnly = normalized.replace(/\D/g, '');
+  return digitsOnly || null;
 }
 
 function normalizeNumber(value, fallback = 0) {
@@ -225,6 +242,46 @@ function hasTrackedPurchase(orderId) {
   return getTrackedPurchaseIds().includes(orderId);
 }
 
+function getNameParts(fullName) {
+  const normalized = normalizeString(fullName);
+  if (!normalized) {
+    return { firstName: null, lastName: null };
+  }
+
+  const [firstName, ...rest] = normalized.split(/\s+/);
+  return {
+    firstName: firstName || null,
+    lastName: rest.length ? rest.join(' ') : null,
+  };
+}
+
+function buildAdvancedMatchingData({ customer = null, shipping = null } = {}) {
+  const customerId =
+    normalizeString(customer?.id) ||
+    normalizeString(customer?._id) ||
+    normalizeString(customer?.userId) ||
+    null;
+  const email = normalizeEmail(customer?.email) || normalizeEmail(shipping?.email);
+  const phone = normalizePhone(customer?.phone) || normalizePhone(shipping?.phone);
+  const nameParts = getNameParts(customer?.name || shipping?.fullName);
+
+  const userData = {
+    em: email,
+    ph: phone,
+    external_id: customerId,
+    fn: normalizeString(nameParts.firstName),
+    ln: normalizeString(nameParts.lastName),
+    ct: normalizeString(shipping?.city),
+    st: normalizeString(shipping?.state),
+    zp: normalizeString(shipping?.postalCode),
+    country: normalizeString(shipping?.country),
+  };
+
+  return Object.fromEntries(
+    Object.entries(userData).filter(([, value]) => Boolean(value)),
+  );
+}
+
 export function trackMetaPageView({ pathname, search = '' } = {}) {
   if (!canUseMetaPixel()) {
     return false;
@@ -240,6 +297,22 @@ export function trackMetaPageView({ pathname, search = '' } = {}) {
 
   lastTrackedPath = currentPath;
   return sendMetaPixelEvent('track', 'PageView');
+}
+
+export function applyMetaAdvancedMatching(input = {}) {
+  const userData = buildAdvancedMatchingData(input);
+
+  if (!Object.keys(userData).length) {
+    return false;
+  }
+
+  const signature = JSON.stringify(userData);
+  if (signature === lastAdvancedMatchingSignature) {
+    return false;
+  }
+
+  lastAdvancedMatchingSignature = signature;
+  return sendMetaPixelEvent('init', PIXEL_ID, userData);
 }
 
 export function trackMetaAddToCart(items, { value, currency = 'INR' } = {}) {
