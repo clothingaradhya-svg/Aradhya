@@ -34,6 +34,7 @@ import {
   normaliseTokenValue,
   searchProducts,
 } from '../lib/api';
+import { trackMetaAddToCart } from '../lib/metaPixel';
 
 const AccordionItem = ({ title, isOpen, onClick, children }) => (
   <div className="border-b border-gray-200">
@@ -81,6 +82,28 @@ const parseReviewPayload = (raw) => {
   } catch {
     return { items: [], summary: null };
   }
+};
+
+const buildMetaCartItem = (item, size, quantity = 1) => {
+  if (!item) return null;
+
+  const variant = findVariantForSize(item, size);
+  const productId = String(
+    variant?.sku || variant?.id || item?.id || item?.handle || item?.title || '',
+  ).trim();
+
+  return {
+    id: variant?.id ?? item?.id ?? item?.handle ?? null,
+    productId: productId || null,
+    sku: variant?.sku ?? null,
+    slug: item?.handle ?? null,
+    handle: item?.handle ?? null,
+    name: item?.title || item?.handle || 'Product',
+    price: Number(variant?.price ?? item?.price ?? 0),
+    currency: variant?.currencyCode ?? item?.currencyCode ?? 'INR',
+    quantity,
+    size: size ?? null,
+  };
 };
 
 const pickReviewField = (review, keys) => {
@@ -714,6 +737,10 @@ const ProductDetails = () => {
 
     // Otherwise, just add main product and go to cart
     addItem(product.handle, { size: primarySize, quantity: 1 });
+    trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
+      value: Number(selectedVariant?.price ?? product?.price ?? 0),
+      currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+    });
     navigate('/cart');
   };
 
@@ -794,12 +821,34 @@ const ProductDetails = () => {
       : null;
 
     if (hasComboItems) {
+      const metaItems = itemsWithSizes
+        .map(({ handle, size, quantity }) => {
+          const comboItem = comboItems.find((item) => item?.handle === handle);
+          return buildMetaCartItem(comboItem, size, quantity ?? 1);
+        })
+        .filter(Boolean);
+
       itemsWithSizes.forEach(({ handle, size, quantity }) => {
         addItem(handle, { size, quantity: quantity ?? 1 });
       });
+
+      if (metaItems.length) {
+        const totalValue = metaItems.reduce(
+          (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+          0,
+        );
+        trackMetaAddToCart(metaItems, {
+          value: totalValue,
+          currency: metaItems[0]?.currency || 'INR',
+        });
+      }
     } else {
       // Add the main product for single-product pages.
       addItem(product.handle, { size: primarySize, quantity: 1 });
+      trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
+        value: Number(selectedVariant?.price ?? product?.price ?? 0),
+        currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+      });
     }
 
     // Close & redirect after cart updates.

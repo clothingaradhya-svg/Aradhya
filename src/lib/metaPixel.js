@@ -1,5 +1,7 @@
 const FLUSH_INTERVAL_MS = 250;
 const MAX_FLUSH_ATTEMPTS = 20;
+const PURCHASE_STORAGE_KEY = 'aradhya-meta-pixel-purchases-v1';
+const MAX_STORED_PURCHASE_IDS = 50;
 
 let lastTrackedPath = null;
 
@@ -89,6 +91,140 @@ function sendMetaPixelEvent(...args) {
   return false;
 }
 
+function normalizeString(value) {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+}
+
+function normalizeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeQuantity(value) {
+  const parsed = normalizeNumber(value, 1);
+  return Math.max(Math.floor(parsed), 1);
+}
+
+function buildMetaContent(item = {}) {
+  const id =
+    normalizeString(item.productId) ||
+    normalizeString(item.sku) ||
+    normalizeString(item.id) ||
+    normalizeString(item.slug) ||
+    normalizeString(item.handle) ||
+    normalizeString(item.name) ||
+    'unknown-item';
+
+  const quantity = normalizeQuantity(item.quantity);
+  const content = {
+    id,
+    quantity,
+  };
+
+  const price = normalizeNumber(item.price, NaN);
+  if (Number.isFinite(price) && price >= 0) {
+    content.item_price = price;
+  }
+
+  const size = normalizeString(item.size);
+  if (size) {
+    content.size = size;
+  }
+
+  return {
+    id,
+    name: normalizeString(item.name) || 'Product',
+    quantity,
+    size,
+    content,
+  };
+}
+
+function buildEventPayload(items, basePayload = {}) {
+  const normalizedItems = (Array.isArray(items) ? items : [items])
+    .map((item) => buildMetaContent(item))
+    .filter(Boolean);
+
+  if (!normalizedItems.length) {
+    return null;
+  }
+
+  const uniqueIds = Array.from(new Set(normalizedItems.map((item) => item.id)));
+  const names = normalizedItems.map((item) => item.name);
+  const sizes = normalizedItems
+    .map((item) => item.size)
+    .filter(Boolean);
+  const totalQuantity = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  const payload = {
+    content_name:
+      names.length === 1 ? names[0] : names.slice(0, 5).join(', '),
+    content_ids: uniqueIds,
+    contents: normalizedItems.map((item) => item.content),
+    content_type: 'product',
+    num_items: totalQuantity,
+    ...basePayload,
+  };
+
+  const customData = {
+    ...(basePayload.custom_data && typeof basePayload.custom_data === 'object'
+      ? basePayload.custom_data
+      : {}),
+  };
+
+  if (sizes.length === 1) {
+    customData.size = sizes[0];
+  } else if (sizes.length > 1) {
+    customData.sizes = sizes;
+  }
+
+  if (Object.keys(customData).length > 0) {
+    payload.custom_data = customData;
+  }
+
+  return payload;
+}
+
+function getTrackedPurchaseIds() {
+  if (!canUseMetaPixel() || typeof window.sessionStorage === 'undefined') {
+    return [];
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(PURCHASE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function markPurchaseTracked(orderId) {
+  if (!orderId || !canUseMetaPixel() || typeof window.sessionStorage === 'undefined') {
+    return;
+  }
+
+  const nextIds = [
+    orderId,
+    ...getTrackedPurchaseIds().filter((entry) => entry !== orderId),
+  ].slice(0, MAX_STORED_PURCHASE_IDS);
+
+  try {
+    window.sessionStorage.setItem(PURCHASE_STORAGE_KEY, JSON.stringify(nextIds));
+  } catch {
+    // Ignore storage failures and still allow event delivery.
+  }
+}
+
+function hasTrackedPurchase(orderId) {
+  if (!orderId) {
+    return false;
+  }
+
+  return getTrackedPurchaseIds().includes(orderId);
+}
+
 export function trackMetaPageView({ pathname, search = '' } = {}) {
   if (!canUseMetaPixel()) {
     return false;
@@ -104,4 +240,47 @@ export function trackMetaPageView({ pathname, search = '' } = {}) {
 
   lastTrackedPath = currentPath;
   return sendMetaPixelEvent('track', 'PageView');
+}
+
+export function trackMetaAddToCart(items, { value, currency = 'INR' } = {}) {
+  const numericValue = normalizeNumber(value, NaN);
+  const payload = buildEventPayload(items, {
+    value: Number.isFinite(numericValue) ? numericValue : 0,
+    currency: normalizeString(currency) || 'INR',
+  });
+
+  if (!payload) {
+    return false;
+  }
+
+  return sendMetaPixelEvent('track', 'AddToCart', payload);
+}
+
+export function trackMetaPurchase({
+  orderId,
+  value,
+  currency = 'INR',
+  items,
+} = {}) {
+  const normalizedOrderId = normalizeString(orderId);
+  if (normalizedOrderId && hasTrackedPurchase(normalizedOrderId)) {
+    return false;
+  }
+
+  const numericValue = normalizeNumber(value, NaN);
+  const payload = buildEventPayload(items, {
+    value: Number.isFinite(numericValue) ? numericValue : 0,
+    currency: normalizeString(currency) || 'INR',
+    custom_data: normalizedOrderId ? { order_id: normalizedOrderId } : {},
+  });
+
+  if (!payload) {
+    return false;
+  }
+
+  const sent = sendMetaPixelEvent('track', 'Purchase', payload);
+  if (normalizedOrderId && canUseMetaPixel()) {
+    markPurchaseTracked(normalizedOrderId);
+  }
+  return sent;
 }
