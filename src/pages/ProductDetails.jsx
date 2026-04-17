@@ -13,6 +13,7 @@ import MobilePageHeader from '../components/MobilePageHeader';
 import FrequentlyBoughtTogether from '../components/FrequentlyBoughtTogether';
 import ProductGrid from '../components/ProductGrid';
 import SizeSelectionModal from '../components/SizeSelectionModal';
+import SeoHead from '../components/SeoHead';
 import { useCatalog } from '../contexts/catalog-context';
 import { useCart } from '../contexts/cart-context';
 import { useWishlist } from '../contexts/wishlist-context';
@@ -35,6 +36,7 @@ import {
   searchProducts,
 } from '../lib/api';
 import { trackMetaAddToCart } from '../lib/metaPixel';
+import { SITE_URL, stripHtml, TARGET_KEYWORDS } from '../lib/seo';
 
 const AccordionItem = ({ title, isOpen, onClick, children }) => (
   <div className="border-b border-gray-200">
@@ -224,6 +226,10 @@ const ProductDetails = () => {
   const comboSizeGuideSignatureRef = useRef('');
 
   const productHandle = product?.handle || '';
+  const productDescriptionText = useMemo(
+    () => stripHtml(product?.descriptionHtml || product?.description || ''),
+    [product?.description, product?.descriptionHtml],
+  );
   const reviewData = useMemo(
     () => parseReviewPayload(product?.reviewsJson),
     [product?.reviewsJson],
@@ -248,6 +254,22 @@ const ProductDetails = () => {
     if (countLabel) return `${countLabel} reviews`;
     return '';
   }, [reviewSummary]);
+  const heroImageUrl = useMemo(() => getProductImageUrl(product), [product]);
+  const productSeoImage = useMemo(() => {
+    if (!heroImageUrl) return `${SITE_URL}/favicon.png`;
+    return heroImageUrl.startsWith('http')
+      ? heroImageUrl
+      : `${SITE_URL}${heroImageUrl.startsWith('/') ? heroImageUrl : `/${heroImageUrl}`}`;
+  }, [heroImageUrl]);
+  const productSeoTitle = product?.title
+    ? `${product.title} Designer Wear for Men`
+    : 'Designer Wear for Men';
+  const productSeoDescription = product?.title
+    ? `${product.title} by Aradhya designer wear for men. ${productDescriptionText || 'Discover premium fits, best colour combinations for men, and occasion-ready styling for India.'}`.slice(0, 160)
+    : 'Aradhya designer wear for men in India with premium outfit combinations.';
+  const stylingNote = product?.title
+    ? `${product.title} is designed for premium men outfit combination styling, whether you are building a party outfit for men in India, a polished date look, or a refined old money wardrobe.`
+    : '';
 
   useEffect(() => {
     let cancelled = false;
@@ -1131,6 +1153,41 @@ const ProductDetails = () => {
 
   return (
     <div className="bg-white min-h-screen pb-40">
+      <SeoHead
+        title={productSeoTitle}
+        description={productSeoDescription}
+        keywords={[
+          TARGET_KEYWORDS[0],
+          TARGET_KEYWORDS[1],
+          TARGET_KEYWORDS[4],
+          TARGET_KEYWORDS[11],
+          TARGET_KEYWORDS[13],
+        ]}
+        canonicalPath={`/product/${product.handle || slug}`}
+        type="product"
+        image={productSeoImage}
+        structuredData={{
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name: product.title,
+          description: productSeoDescription,
+          image: images.map((image) => image?.url).filter(Boolean),
+          sku: String(selectedVariant?.sku || selectedVariant?.id || product.id || product.handle || ''),
+          brand: {
+            '@type': 'Brand',
+            name: 'Aradhya',
+          },
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: selectedVariant?.currencyCode || product?.currencyCode || 'INR',
+            price: Number(selectedVariant?.price ?? product?.price ?? 0),
+            availability: selectedVariant?.availableForSale === false
+              ? 'https://schema.org/OutOfStock'
+              : 'https://schema.org/InStock',
+            url: `${SITE_URL}/product/${product.handle || slug}`,
+          },
+        }}
+      />
 
       {/* Mobile Top Section: Image, Overlay Header */}
       <div className="lg:hidden relative w-full bg-white mb-4">
@@ -1177,7 +1234,7 @@ const ProductDetails = () => {
           {images.length > 0 ? (
             <img
               src={images[activeImageIndex]?.url}
-              alt={product.title}
+              alt={`${product.title} by Aradhya designer wear for men`}
               className="w-full h-auto object-cover"
             />
           ) : (
@@ -1237,7 +1294,7 @@ const ProductDetails = () => {
                 >
                   <img
                     src={img.url}
-                    alt={img.alt || product.title}
+                    alt={img.alt || `${product.title} designer wear for men by Aradhya`}
                     className="w-full h-full object-contain bg-white"
                   />
                 </button>
@@ -1248,7 +1305,7 @@ const ProductDetails = () => {
               {images.length ? (
                 <img
                   src={images[activeImageIndex]?.url}
-                  alt={product.title}
+                  alt={`${product.title} by Aradhya designer wear for men`}
                   className="w-full h-full object-contain object-center bg-white"
                 />
               ) : (
@@ -1304,6 +1361,11 @@ const ProductDetails = () => {
                 <h1 className="text-xl md:text-2xl font-semibold text-gray-900">
                   {product.title}
                 </h1>
+                {stylingNote ? (
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
+                    {stylingNote}
+                  </p>
+                ) : null}
               </div>
               <span className="text-xl font-bold text-gray-900">{price}</span>
             </div>

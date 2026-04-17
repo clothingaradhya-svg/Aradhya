@@ -75,7 +75,9 @@ const ProductCard = ({ item, enableImageScroller = false }) => {
     hasScroller && imageList[activeImageIndex]
       ? imageList[activeImageIndex]
       : imageList[0] || img || featuredImage?.url;
-  const imageAlt = featuredImage?.altText || title || 'Product image';
+  const imageAlt =
+    featuredImage?.altText ||
+    (title ? `${title} designer wear for men by Aradhya` : 'Aradhya product image');
   const currencyCode =
     price?.currencyCode ||
     price?.currency ||

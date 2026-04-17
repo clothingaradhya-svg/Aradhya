@@ -44,7 +44,7 @@ export default function OccasionSelector({ selectedSkintone }) {
                     >
                         <img
                             src={occasion.image}
-                            alt={occasion.title}
+                            alt={`${occasion.title} outfit ideas for men in India`}
                             className="block w-full h-auto transition-transform duration-700 group-hover:scale-[1.02]"
                             loading="lazy"
                         />

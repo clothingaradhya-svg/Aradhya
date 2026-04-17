@@ -4,8 +4,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import SeoHead from '../components/SeoHead';
 import { useCatalog } from '../contexts/catalog-context';
 import { fetchProductsPage, normaliseTokenValue, toProductCard } from '../lib/api';
+import { TARGET_KEYWORDS } from '../lib/seo';
 
 const normalizeForMatch = (value) => {
   const normalized = normaliseTokenValue(value);
@@ -383,6 +385,35 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
   const pageTitle = shouldGroupBySkintone && displayOccasion
     ? displayOccasion
     : (activeCategory === 'all' ? 'All Products' : formatLabel(activeCategory));
+  const queryString = searchParams.toString();
+  const canonicalPath = `/products${queryString ? `?${queryString}` : ''}`;
+  const seoTitle = displaySkintone && displayOccasion
+    ? `${displaySkintone} ${displayOccasion} Outfit Ideas for Men`
+    : displaySkintone
+      ? `${displaySkintone} Outfit Combinations for Men`
+      : displayOccasion
+        ? `${displayOccasion} Outfit Ideas for Men India`
+        : activeCategory !== 'all'
+          ? `${formatLabel(activeCategory)} for Men`
+          : 'Men Outfit Combination and Designer Wear';
+  const seoDescription = displaySkintone && displayOccasion
+    ? `Browse ${displaySkintone.toLowerCase()} ${displayOccasion.toLowerCase()} looks from Aradhya designer wear with curated men outfit combination ideas for India.`
+    : displaySkintone
+      ? `Discover ${displaySkintone.toLowerCase()} styling with skintone based outfit combinations for men, the best colour combination for men, and easy premium looks from Aradhya.`
+      : displayOccasion
+        ? `Shop ${displayOccasion.toLowerCase()} looks from Aradhya designer wear with shirt and pant shoes combination for men, party outfit ideas, and India-ready styling.`
+        : activeCategory !== 'all'
+          ? `Shop ${formatLabel(activeCategory).toLowerCase()} from Aradhya designer wear with premium men outfit combination ideas for India.`
+          : `Explore Aradhya designer wear, men outfit under 2500 ideas, and occasion-ready combinations for date, party, college, and old money styling.`;
+  const seoIntro = displaySkintone && displayOccasion
+    ? `${displaySkintone} and ${displayOccasion} filters are active, so these products focus on colour, fit, and combinations that feel polished on Indian men.`
+    : displaySkintone
+      ? `These picks focus on ${displaySkintone.toLowerCase()} styling so you can find natural shirt, trouser, and shoe combinations with better contrast and balance.`
+      : displayOccasion
+        ? `These edited looks help you build a confident ${displayOccasion.toLowerCase()} wardrobe with versatile combinations that work in India.`
+        : activeCategory !== 'all'
+          ? `Explore this category with Aradhya styling ideas designed around fit, colour balance, and premium everyday wear.`
+          : `Browse men outfit combination ideas across budget looks, skintone styling, and occasion-led designer wear for men in India.`;
 
   const updateFilter = (key, value) => {
     const prev = new URLSearchParams(searchParams);
@@ -403,6 +434,28 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg-page)]">
+      <SeoHead
+        title={seoTitle}
+        description={seoDescription}
+        keywords={[
+          TARGET_KEYWORDS[0],
+          displaySkintone ? TARGET_KEYWORDS[2] : TARGET_KEYWORDS[1],
+          displayOccasion?.toLowerCase().includes('party')
+            ? TARGET_KEYWORDS[11]
+            : displayOccasion?.toLowerCase().includes('date')
+              ? TARGET_KEYWORDS[10]
+              : TARGET_KEYWORDS[4],
+          displaySkintone?.toLowerCase().includes('fair')
+            ? TARGET_KEYWORDS[7]
+            : displaySkintone?.toLowerCase().includes('neutral')
+              ? TARGET_KEYWORDS[9]
+              : displaySkintone?.toLowerCase().includes('dark')
+                ? TARGET_KEYWORDS[6]
+                : TARGET_KEYWORDS[3],
+        ]}
+        canonicalPath={canonicalPath}
+      />
+
       {/* Mobile Header */}
       <MobilePageHeader
         title={pageTitle}
@@ -417,6 +470,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
         <h1 className="text-lg font-bold text-gray-800 capitalize">
           {pageTitle} <span className="text-gray-400 font-normal text-sm">- {totalItems} items</span>
         </h1>
+        <p className="max-w-3xl text-sm leading-6 text-gray-600">{seoIntro}</p>
       </div>
 
       {/* Mobile Filter Bar */}
@@ -555,6 +609,15 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
 
       {/* Product Grid */}
       <div className="site-shell py-6 lg:py-8 mb-20 md:mb-0">
+        <section className="mb-6 rounded-3xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+          <h2 className="text-base font-semibold text-slate-950">
+            Men&apos;s styling picks by category, skin tone, and occasion
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-gray-600">
+            {seoDescription}
+          </p>
+        </section>
+
         {loading ? (
           <div className="flex justify-center py-20 text-gray-500">Loading products...</div>
         ) : shouldGroupBySkintone ? (

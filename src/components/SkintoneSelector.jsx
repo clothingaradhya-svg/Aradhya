@@ -39,7 +39,7 @@ export default function SkintoneSelector({ onSelect }) {
             >
               <img
                 src={tone.image}
-                alt={tone.label}
+                alt={`${tone.label} outfit combinations for men`}
                 className="block w-full h-auto"
                 loading="lazy"
               />

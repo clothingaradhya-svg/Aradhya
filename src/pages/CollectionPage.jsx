@@ -3,8 +3,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import SeoHead from '../components/SeoHead';
 import { useCatalog } from '../contexts/catalog-context';
 import { normaliseTokenValue, toProductCard, fetchCollectionByHandle } from '../lib/api';
+import { TARGET_KEYWORDS } from '../lib/seo';
 
 const normalizeForMatch = (value) => {
     const normalized = normaliseTokenValue(value);
@@ -15,6 +17,16 @@ const normalizeForMatch = (value) => {
 const tokenize = (value) => normalizeForMatch(value).split(' ').filter(Boolean);
 
 const uniqueTokens = (values) => Array.from(new Set(values.filter(Boolean)));
+
+const formatLabel = (value) => {
+    if (!value) return '';
+    return value
+        .toString()
+        .replace(/[-_]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 const matchesToken = (source, targetTokens) => {
     if (!source || targetTokens.length === 0) return false;
@@ -161,23 +173,50 @@ const CollectionPage = () => {
         setSearchParams(prev);
     };
 
+    const collectionTitle = collectionInfo?.title || formatLabel(handle);
+    const displaySkintone = formatLabel(skintoneFilter);
+    const queryString = searchParams.toString();
+    const canonicalPath = `/collections/${handle}${queryString ? `?${queryString}` : ''}`;
+    const seoTitle = displaySkintone
+        ? `${collectionTitle} for ${displaySkintone} Men`
+        : `${collectionTitle} Designer Wear for Men`;
+    const seoDescription = displaySkintone
+        ? `Shop ${collectionTitle.toLowerCase()} from Aradhya designer wear with ${displaySkintone.toLowerCase()} outfit combinations for men, balanced colour pairings, and premium styling for India.`
+        : `Explore ${collectionTitle.toLowerCase()} from Aradhya designer wear with men outfit combination ideas, premium styling, and occasion-ready looks for India.`;
+    const collectionIntro = displaySkintone
+        ? `This collection is filtered for ${displaySkintone.toLowerCase()} styling so you can browse combinations that feel sharper, more balanced, and easier to wear.`
+        : `This collection brings together polished pieces designed for premium everyday dressing, refined party looks, and elevated men outfit combinations in India.`;
+
     return (
         <div className="bg-white min-h-screen">
+            <SeoHead
+                title={seoTitle}
+                description={seoDescription}
+                keywords={[
+                    TARGET_KEYWORDS[0],
+                    TARGET_KEYWORDS[1],
+                    displaySkintone ? TARGET_KEYWORDS[2] : TARGET_KEYWORDS[4],
+                    TARGET_KEYWORDS[13],
+                ]}
+                canonicalPath={canonicalPath}
+            />
+
             <MobilePageHeader
-                title={collectionInfo?.title || handle}
+                title={collectionTitle}
                 onSearch={() => document.dispatchEvent(new CustomEvent('open-search'))}
             />
 
             <div className="site-shell pt-6 pb-4">
                 <div className="text-xs text-gray-500 mb-2">
-                    Home / Collections / <span className="font-bold text-gray-800 capitalize">{collectionInfo?.title || handle}</span>
+                    Home / Collections / <span className="font-bold text-gray-800 capitalize">{collectionTitle}</span>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-6 items-end md:items-center justify-between mb-6">
                     <div>
                         <h1 className="text-3xl font-extrabold text-gray-900 capitalize mb-2">
-                            {collectionInfo?.title || handle}
+                            {collectionTitle}
                         </h1>
+                        <p className="max-w-2xl text-sm leading-6 text-gray-600 mb-2">{collectionIntro}</p>
                         {collectionInfo?.description && (
                             <p className="text-gray-600 max-w-2xl">{collectionInfo.description}</p>
                         )}

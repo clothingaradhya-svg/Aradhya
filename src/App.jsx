@@ -21,6 +21,7 @@ import LegalPage from './pages/LegalPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import BlogPage from './pages/BlogPage';
+import BlogArticlePage from './pages/BlogArticlePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
@@ -104,6 +105,7 @@ export default function App() {
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="blog" element={<BlogPage />} />
+            <Route path="blog/:slug" element={<BlogArticlePage />} />
             <Route path="faq" element={<ContactPage />} />
             <Route path="shiprocket-demo" element={<ShiprocketPage />} />
             <Route path="login" element={<LoginPage />} />
