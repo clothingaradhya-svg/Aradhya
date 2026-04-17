@@ -11,10 +11,12 @@ const MetaAdvancedMatchingTracker = () => {
   useEffect(() => {
     const checkoutDraft = getCheckoutDraft();
 
-    applyMetaAdvancedMatching({
-      customer,
-      shipping: checkoutDraft?.shipping || null,
-    });
+    (async () => {
+      await applyMetaAdvancedMatching({
+        customer,
+        shipping: checkoutDraft?.shipping || null,
+      });
+    })();
   }, [customer, pathname, search]);
 
   return null;

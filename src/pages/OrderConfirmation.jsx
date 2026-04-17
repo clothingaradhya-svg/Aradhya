@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { CheckCircle, Package, Truck, Home } from 'lucide-react';
-import { trackMetaPurchase } from '../lib/metaPixel';
+import { applyMetaAdvancedMatching, trackMetaPurchase } from '../lib/metaPixel';
 
 const OrderConfirmation = () => {
   const location = useLocation();
@@ -53,12 +53,19 @@ const OrderConfirmation = () => {
   useEffect(() => {
     if (!order) return;
 
-    trackMetaPurchase({
-      orderId: order?.id || order?.number || order?._id || null,
-      value: purchaseValue,
-      currency: purchaseCurrency,
-      items: purchaseItems,
-    });
+    (async () => {
+      await applyMetaAdvancedMatching({
+        customer: order?.customer || null,
+        shipping: order?.shipping || null,
+      });
+
+      trackMetaPurchase({
+        orderId: order?.id || order?.number || order?._id || null,
+        value: purchaseValue,
+        currency: purchaseCurrency,
+        items: purchaseItems,
+      });
+    })();
   }, [order, purchaseCurrency, purchaseItems, purchaseValue]);
 
   if (!order) {

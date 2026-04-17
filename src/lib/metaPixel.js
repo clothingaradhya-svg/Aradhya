@@ -113,6 +113,30 @@ function normalizePhone(value) {
   return digitsOnly || null;
 }
 
+async function hashValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (
+    typeof window === 'undefined' ||
+    !window.crypto ||
+    !window.crypto.subtle ||
+    typeof TextEncoder === 'undefined'
+  ) {
+    return value;
+  }
+
+  const digest = await window.crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(value),
+  );
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 function normalizeNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -255,7 +279,7 @@ function getNameParts(fullName) {
   };
 }
 
-function buildAdvancedMatchingData({ customer = null, shipping = null } = {}) {
+async function buildAdvancedMatchingData({ customer = null, shipping = null } = {}) {
   const customerId =
     normalizeString(customer?.id) ||
     normalizeString(customer?._id) ||
@@ -265,18 +289,23 @@ function buildAdvancedMatchingData({ customer = null, shipping = null } = {}) {
   const phone = normalizePhone(customer?.phone) || normalizePhone(shipping?.phone);
   const nameParts = getNameParts(customer?.name || shipping?.fullName);
 
-  const userData = {
+  const normalizedData = {
     em: email,
     ph: phone,
-    external_id: customerId,
-    fn: normalizeString(nameParts.firstName),
-    ln: normalizeString(nameParts.lastName),
-    ct: normalizeString(shipping?.city),
-    st: normalizeString(shipping?.state),
+    external_id: normalizeString(customerId),
+    fn: normalizeString(nameParts.firstName)?.toLowerCase() || null,
+    ln: normalizeString(nameParts.lastName)?.toLowerCase() || null,
+    ct: normalizeString(shipping?.city)?.toLowerCase() || null,
+    st: normalizeString(shipping?.state)?.toLowerCase() || null,
     zp: normalizeString(shipping?.postalCode),
-    country: normalizeString(shipping?.country),
+    country: normalizeString(shipping?.country)?.toLowerCase() || null,
   };
 
+  const hashedEntries = await Promise.all(
+    Object.entries(normalizedData).map(async ([key, value]) => [key, await hashValue(value)]),
+  );
+
+  const userData = Object.fromEntries(hashedEntries);
   return Object.fromEntries(
     Object.entries(userData).filter(([, value]) => Boolean(value)),
   );
@@ -299,8 +328,8 @@ export function trackMetaPageView({ pathname, search = '' } = {}) {
   return sendMetaPixelEvent('track', 'PageView');
 }
 
-export function applyMetaAdvancedMatching(input = {}) {
-  const userData = buildAdvancedMatchingData(input);
+export async function applyMetaAdvancedMatching(input = {}) {
+  const userData = await buildAdvancedMatchingData(input);
 
   if (!Object.keys(userData).length) {
     return false;
