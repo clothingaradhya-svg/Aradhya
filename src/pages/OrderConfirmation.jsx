@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { CheckCircle, Package, Truck, Home } from 'lucide-react';
+import { trackMetaPurchase } from '../lib/metaPixel';
 
 const OrderConfirmation = () => {
   const location = useLocation();
@@ -9,6 +10,56 @@ const OrderConfirmation = () => {
   const awb = String(
     order?.shipping?.awbCode || order?.shipping?.awb || order?.shipping?.trackingNumber || '',
   ).trim();
+
+  const purchaseItems = useMemo(() => {
+    const candidates = Array.isArray(order?.items)
+      ? order.items
+      : Array.isArray(order?.lineItems)
+        ? order.lineItems
+        : [];
+
+    return candidates.map((item) => ({
+      id: item?.productId ?? item?.variantId ?? item?.id ?? item?.sku ?? item?.slug ?? null,
+      productId:
+        item?.sku ?? item?.productId ?? item?.variantId ?? item?.id ?? item?.slug ?? null,
+      sku: item?.sku ?? null,
+      slug: item?.slug ?? null,
+      handle: item?.slug ?? item?.handle ?? null,
+      name: item?.name ?? item?.title ?? item?.productName ?? 'Product',
+      price: Number(item?.price ?? item?.unitPrice ?? item?.amount ?? 0),
+      currency: item?.currency ?? order?.currency ?? order?.totals?.currency ?? 'INR',
+      quantity: Number(item?.quantity ?? 1),
+      size: item?.size ?? item?.variantTitle ?? null,
+    }));
+  }, [order]);
+
+  const purchaseValue = useMemo(
+    () =>
+      Number(
+        order?.totals?.total ??
+          order?.total ??
+          order?.amount ??
+          purchaseItems.reduce(
+            (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+            0,
+          ),
+      ),
+    [order, purchaseItems],
+  );
+
+  const purchaseCurrency =
+    order?.totals?.currency || order?.currency || purchaseItems[0]?.currency || 'INR';
+
+  useEffect(() => {
+    if (!order) return;
+
+    trackMetaPurchase({
+      orderId: order?.id || order?.number || order?._id || null,
+      value: purchaseValue,
+      currency: purchaseCurrency,
+      items: purchaseItems,
+    });
+  }, [order, purchaseCurrency, purchaseItems, purchaseValue]);
 
   if (!order) {
     return <Navigate to="/orders" replace />;

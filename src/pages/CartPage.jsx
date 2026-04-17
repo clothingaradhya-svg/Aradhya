@@ -10,6 +10,7 @@ import {
   isSizeOptionName,
 } from '../lib/api';
 import { setCheckoutDraft } from '../lib/checkout';
+import { trackMetaInitiateCheckout } from '../lib/metaPixel';
 import { useCatalog } from '../contexts/catalog-context';
 import { useWishlist } from '../contexts/wishlist-context';
 import { useNotifications } from '../components/NotificationProvider';
@@ -290,6 +291,11 @@ const CartPage = () => {
           itemCount,
         },
         appliedDiscount: null,
+      });
+
+      trackMetaInitiateCheckout(checkoutItems, {
+        value: subtotal,
+        currency,
       });
 
       navigate('/checkout/address');

@@ -21,7 +21,6 @@ import {
   getCheckoutDraft,
   setCheckoutDraft,
 } from '../lib/checkout';
-import { trackMetaPurchase } from '../lib/metaPixel';
 
 const PAYMENT_METHODS = [
   {
@@ -260,13 +259,6 @@ export default function Payment() {
   };
 
   const finalizeOrderSuccess = async (order) => {
-    trackMetaPurchase({
-      orderId: order?.id || order?.number || order?._id || null,
-      value: finalTotal,
-      currency,
-      items: Array.isArray(draft?.items) ? draft.items : [],
-    });
-
     const checkoutItems = Array.isArray(draft?.items) ? draft.items : [];
     checkoutItems.forEach((item) => {
       removeItem(item.slug, item.size ?? null);

@@ -256,6 +256,20 @@ export function trackMetaAddToCart(items, { value, currency = 'INR' } = {}) {
   return sendMetaPixelEvent('track', 'AddToCart', payload);
 }
 
+export function trackMetaInitiateCheckout(items, { value, currency = 'INR' } = {}) {
+  const numericValue = normalizeNumber(value, NaN);
+  const payload = buildEventPayload(items, {
+    value: Number.isFinite(numericValue) ? numericValue : 0,
+    currency: normalizeString(currency) || 'INR',
+  });
+
+  if (!payload) {
+    return false;
+  }
+
+  return sendMetaPixelEvent('track', 'InitiateCheckout', payload);
+}
+
 export function trackMetaPurchase({
   orderId,
   value,
