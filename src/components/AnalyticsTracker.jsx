@@ -5,25 +5,30 @@ import {
   initializeAnalytics,
   trackPageView,
 } from '../lib/googleAnalytics';
+import { trackMetaPageView } from '../lib/metaPixel';
 
 const AnalyticsTracker = () => {
   const { pathname, search } = useLocation();
   const hasTrackedInitialPage = useRef(false);
 
   useEffect(() => {
-    if (!getAnalyticsMeasurementId()) {
-      return;
+    const hasGoogleAnalytics = Boolean(getAnalyticsMeasurementId());
+
+    if (hasGoogleAnalytics) {
+      initializeAnalytics();
     }
 
-    initializeAnalytics();
-
-    // The initial page view is handled by the head-level GA config tag.
+    // The initial page view is handled by the head-level analytics tags.
     if (!hasTrackedInitialPage.current) {
       hasTrackedInitialPage.current = true;
       return;
     }
 
-    trackPageView({ pathname, search });
+    if (hasGoogleAnalytics) {
+      trackPageView({ pathname, search });
+    }
+
+    trackMetaPageView({ pathname, search });
   }, [pathname, search]);
 
   return null;
