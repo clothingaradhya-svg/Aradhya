@@ -54,6 +54,12 @@ const OrderConfirmation = () => {
     if (!order) return;
 
     (async () => {
+      console.info('[Meta Pixel] Purchase event firing', {
+        orderId: order?.id || order?.number || order?._id || null,
+        value: purchaseValue,
+        currency: purchaseCurrency,
+      });
+
       await applyMetaAdvancedMatching({
         customer: order?.customer || null,
         shipping: order?.shipping || null,

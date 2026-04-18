@@ -1,19 +1,16 @@
-const FLUSH_INTERVAL_MS = 250;
-const MAX_FLUSH_ATTEMPTS = 20;
 const META_PIXEL_SCRIPT_ID = 'aradhya-meta-pixel-script';
 const META_PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
+const META_PIXEL_REQUEST_URL = 'https://www.facebook.com/tr/';
 const PURCHASE_STORAGE_KEY = 'aradhya-meta-pixel-purchases-v1';
 const META_TEST_MODE_STORAGE_KEY = 'aradhya-meta-pixel-test-mode-v1';
 const META_TEST_CODE_STORAGE_KEY = 'aradhya-meta-pixel-test-code-v1';
 const MAX_STORED_PURCHASE_IDS = 50;
 const PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID || '839123811919855';
 
-let metaPixelScriptPromise = null;
 let lastTrackedPath = null;
 let lastAdvancedMatchingSignature = null;
-let pendingAdvancedMatchingData = null;
 let pixelInitialized = false;
-let pixelInitializedWithUserData = false;
+let advancedMatchingSignature = null;
 
 function canUseMetaPixel() {
   return typeof window !== 'undefined' && typeof document !== 'undefined' && Boolean(PIXEL_ID);
@@ -22,6 +19,16 @@ function canUseMetaPixel() {
 function normalizeString(value) {
   const normalized = String(value ?? '').trim();
   return normalized || null;
+}
+
+function normalizeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeQuantity(value) {
+  const parsed = normalizeNumber(value, 1);
+  return Math.max(Math.floor(parsed), 1);
 }
 
 function isTruthyToken(value) {
@@ -44,6 +51,95 @@ function getUrlSearchParams() {
   } catch {
     return null;
   }
+}
+
+function getDebugEvents() {
+  if (!Array.isArray(window.__metaPixelDebugEvents)) {
+    window.__metaPixelDebugEvents = [];
+  }
+
+  return window.__metaPixelDebugEvents;
+}
+
+function getNetworkEvents() {
+  if (!Array.isArray(window.__metaPixelNetworkEvents)) {
+    window.__metaPixelNetworkEvents = [];
+  }
+
+  return window.__metaPixelNetworkEvents;
+}
+
+function logMetaPixel(message, detail = null) {
+  if (detail !== null && detail !== undefined) {
+    console.info(`[Meta Pixel] ${message}`, detail);
+    return;
+  }
+
+  console.info(`[Meta Pixel] ${message}`);
+}
+
+function hasBaseInitializationMarker() {
+  return canUseMetaPixel() && window.__aradhyaMetaPixelBaseInitialized === true;
+}
+
+function markBaseInitialized() {
+  if (!canUseMetaPixel()) {
+    return;
+  }
+
+  window.__aradhyaMetaPixelBaseInitialized = true;
+  window.__aradhyaMetaPixelId = PIXEL_ID;
+  pixelInitialized = true;
+}
+
+function recordDebugEvent(type, detail = {}) {
+  if (!canUseMetaPixel()) {
+    return;
+  }
+
+  const entry = {
+    type,
+    detail,
+    url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    timestamp: new Date().toISOString(),
+  };
+
+  getDebugEvents().push(entry);
+
+  if (getDebugEvents().length > 200) {
+    getDebugEvents().shift();
+  }
+}
+
+function recordNetworkEvent(type, detail = {}) {
+  if (!canUseMetaPixel()) {
+    return;
+  }
+
+  const entry = {
+    type,
+    detail,
+    url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    timestamp: new Date().toISOString(),
+  };
+
+  getNetworkEvents().push(entry);
+
+  if (getNetworkEvents().length > 200) {
+    getNetworkEvents().shift();
+  }
+}
+
+function getMetaPixelFn() {
+  if (typeof window.fbq === 'function') {
+    return window.fbq;
+  }
+
+  if (typeof window._fbq === 'function') {
+    return window._fbq;
+  }
+
+  return null;
 }
 
 function isMetaTestModeEnabled() {
@@ -139,11 +235,7 @@ export function syncMetaDebugQueryParams() {
 
 export function appendMetaDebugParams(path) {
   const target = String(path || '').trim();
-  if (!target) {
-    return target;
-  }
-
-  if (!canUseMetaPixel()) {
+  if (!target || !canUseMetaPixel()) {
     return target;
   }
 
@@ -167,247 +259,188 @@ export function appendMetaDebugParams(path) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-function getMetaPixelFn() {
-  if (typeof window.fbq === 'function') {
-    return window.fbq;
+function ensureMetaPixelSnippet() {
+  if (!canUseMetaPixel()) {
+    return null;
   }
 
-  if (typeof window._fbq === 'function') {
-    return window._fbq;
+  let n = null;
+  let t = null;
+  let s = null;
+
+  if (!getMetaPixelFn()) {
+    if (!window.fbq) {
+      n = window.fbq = function metaPixelStub() {
+        if (n.callMethod) {
+          n.callMethod.apply(n, arguments);
+          return;
+        }
+
+        n.queue.push(arguments);
+      };
+
+      if (!window._fbq) {
+        window._fbq = n;
+      }
+
+      n.push = n;
+      n.loaded = true;
+      n.version = '2.0';
+      n.queue = [];
+    }
+
+    recordDebugEvent('stub_ready', { pixelId: PIXEL_ID });
+    logMetaPixel('fbq stub ready', { pixelId: PIXEL_ID });
   }
 
-  return null;
+  if (!document.getElementById(META_PIXEL_SCRIPT_ID)) {
+    t = document.createElement('script');
+    t.id = META_PIXEL_SCRIPT_ID;
+    t.async = true;
+    t.src = META_PIXEL_SCRIPT_SRC;
+    t.onload = () => {
+      recordDebugEvent('script_loaded', { pixelId: PIXEL_ID });
+      logMetaPixel('Pixel script loaded', { pixelId: PIXEL_ID });
+    };
+    t.onerror = () => {
+      recordDebugEvent('script_failed', { pixelId: PIXEL_ID });
+      logMetaPixel('Pixel script failed to load', { pixelId: PIXEL_ID });
+    };
+    s = document.getElementsByTagName('script')[0];
+
+    if (s?.parentNode) {
+      s.parentNode.insertBefore(t, s);
+    } else {
+      document.head.appendChild(t);
+    }
+
+    recordDebugEvent('script_injected', { pixelId: PIXEL_ID });
+    logMetaPixel('Injecting pixel script', { pixelId: PIXEL_ID });
+  }
+
+  return getMetaPixelFn();
 }
 
-function isMetaPixelReady(fbq = getMetaPixelFn()) {
-  return typeof fbq === 'function' && typeof fbq.callMethod === 'function';
-}
-
-function getPendingCalls() {
-  if (!Array.isArray(window.__metaPixelPendingCalls)) {
-    window.__metaPixelPendingCalls = [];
+function initializeMetaPixelBase() {
+  const fbq = ensureMetaPixelSnippet();
+  if (!fbq) {
+    return null;
   }
 
-  return window.__metaPixelPendingCalls;
-}
-
-function getDebugEvents() {
-  if (!Array.isArray(window.__metaPixelDebugEvents)) {
-    window.__metaPixelDebugEvents = [];
+  if (!pixelInitialized && hasBaseInitializationMarker()) {
+    pixelInitialized = true;
+    recordDebugEvent('init_reused', { pixelId: PIXEL_ID });
+    logMetaPixel('Pixel init reused from head snippet', { pixelId: PIXEL_ID });
+    return fbq;
   }
 
-  return window.__metaPixelDebugEvents;
-}
-
-function recordDebugEvent(type, detail = {}) {
-  if (!canUseMetaPixel() || !isMetaTestModeEnabled()) {
-    return;
+  if (!pixelInitialized) {
+    fbq('init', PIXEL_ID);
+    markBaseInitialized();
+    recordDebugEvent('init', { pixelId: PIXEL_ID });
+    logMetaPixel('Pixel initialized', { pixelId: PIXEL_ID });
   }
 
-  const entry = {
-    type,
-    detail,
-    url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
-    timestamp: new Date().toISOString(),
-  };
+  return fbq;
+}
 
-  getDebugEvents().push(entry);
+function buildTestPingUrl(eventName, payload = null) {
+  const params = new URLSearchParams();
+  params.set('id', PIXEL_ID);
+  params.set('ev', eventName);
+  params.set('dl', window.location.href);
+  params.set('if', 'false');
+  params.set('ts', String(Date.now()));
 
-  if (getDebugEvents().length > 100) {
-    getDebugEvents().shift();
+  if (document.referrer) {
+    params.set('rl', document.referrer);
   }
 
   const testCode = getMetaTestCode();
-  const codeSuffix = testCode ? ` (test_event_code=${testCode})` : '';
-  console.info(`[Meta Pixel Test] ${type}${codeSuffix}`, detail);
-}
-
-function ensureMetaPixelStub() {
-  if (!canUseMetaPixel()) {
-    return null;
+  if (testCode) {
+    params.set('test_event_code', testCode);
   }
 
-  if (getMetaPixelFn()) {
-    return getMetaPixelFn();
-  }
+  const normalizedPayload = payload && typeof payload === 'object' ? payload : null;
+  if (normalizedPayload) {
+    Object.entries(normalizedPayload).forEach(([key, value]) => {
+      if (value === undefined || value === null) {
+        return;
+      }
 
-  const stub = function metaPixelStub(...args) {
-    stub.callMethod ? stub.callMethod.apply(stub, args) : stub.queue.push(args);
-  };
+      const serialized =
+        typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : JSON.stringify(value);
 
-  stub.push = stub;
-  stub.loaded = false;
-  stub.version = '2.0';
-  stub.queue = Array.isArray(window.__metaPixelPendingCalls)
-    ? window.__metaPixelPendingCalls
-    : [];
-
-  window.__metaPixelPendingCalls = stub.queue;
-  window.fbq = stub;
-  window._fbq = stub;
-
-  return stub;
-}
-
-function ensureMetaPixelLoaded() {
-  if (!canUseMetaPixel()) {
-    return null;
-  }
-
-  const currentScript = document.getElementById(META_PIXEL_SCRIPT_ID);
-  if (currentScript) {
-    if (!metaPixelScriptPromise) {
-      metaPixelScriptPromise = Promise.resolve(currentScript);
-    }
-    ensureMetaPixelStub();
-    return metaPixelScriptPromise;
-  }
-
-  if (metaPixelScriptPromise) {
-    ensureMetaPixelStub();
-    return metaPixelScriptPromise;
-  }
-
-  ensureMetaPixelStub();
-
-  metaPixelScriptPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.id = META_PIXEL_SCRIPT_ID;
-    script.async = true;
-    script.src = META_PIXEL_SCRIPT_SRC;
-    script.onload = () => {
-      recordDebugEvent('script_loaded', { pixelId: PIXEL_ID });
-      resolve(script);
-    };
-    script.onerror = () => {
-      recordDebugEvent('script_failed', { pixelId: PIXEL_ID });
-      reject(new Error('Failed to load Meta Pixel script.'));
-    };
-    document.head.appendChild(script);
-  }).catch((error) => {
-    metaPixelScriptPromise = null;
-    throw error;
-  });
-
-  recordDebugEvent('script_injected', { pixelId: PIXEL_ID });
-  return metaPixelScriptPromise;
-}
-
-function getCurrentAdvancedMatchingData() {
-  return pendingAdvancedMatchingData && Object.keys(pendingAdvancedMatchingData).length > 0
-    ? pendingAdvancedMatchingData
-    : null;
-}
-
-function initializeMetaPixel(userData = null) {
-  if (!canUseMetaPixel()) {
-    return false;
-  }
-
-  const fbq = ensureMetaPixelStub();
-  const normalizedUserData =
-    userData && typeof userData === 'object' && Object.keys(userData).length > 0
-      ? userData
-      : null;
-
-  if (pixelInitialized && (!normalizedUserData || pixelInitializedWithUserData)) {
-    return true;
-  }
-
-  if (normalizedUserData) {
-    fbq('init', PIXEL_ID, normalizedUserData);
-    pixelInitializedWithUserData = true;
-    recordDebugEvent('init', { pixelId: PIXEL_ID, userData: normalizedUserData });
-  } else {
-    fbq('init', PIXEL_ID);
-    recordDebugEvent('init', { pixelId: PIXEL_ID });
-  }
-
-  pixelInitialized = true;
-  return true;
-}
-
-function flushPendingCalls() {
-  const fbq = getMetaPixelFn();
-
-  if (!isMetaPixelReady(fbq)) {
-    return false;
-  }
-
-  const pendingCalls = getPendingCalls();
-
-  while (pendingCalls.length > 0) {
-    const args = pendingCalls.shift();
-    fbq(...args);
-    const [method, eventName, payload] = args;
-    recordDebugEvent('event_flushed', {
-      method,
-      eventName,
-      payload: payload || null,
+      params.set(`cd[${key}]`, serialized);
     });
   }
 
-  window.__metaPixelFlushAttempts = 0;
+  return `${META_PIXEL_REQUEST_URL}?${params.toString()}`;
+}
+
+function sendMetaTestPing(eventName, payload = null) {
+  if (!canUseMetaPixel() || !isMetaTestModeEnabled()) {
+    return false;
+  }
+
+  const url = buildTestPingUrl(eventName, payload);
+  const image = new Image(1, 1);
+
+  image.onload = () => {
+    recordNetworkEvent('request_loaded', { eventName, url });
+    logMetaPixel(`Network request loaded for ${eventName}`, { url });
+  };
+
+  image.onerror = () => {
+    recordNetworkEvent('request_failed', { eventName, url });
+    logMetaPixel(`Network request failed for ${eventName}`, { url });
+  };
+
+  image.src = url;
+  window.__metaPixelLastTestPing = image;
+
+  recordNetworkEvent('request_started', { eventName, url });
+  logMetaPixel(`Network request started for ${eventName}`, { url });
   return true;
 }
 
-function schedulePendingCallFlush() {
-  if (window.__metaPixelFlushTimer) {
-    return;
-  }
-
-  const runFlush = () => {
-    window.__metaPixelFlushTimer = null;
-
-    if (flushPendingCalls()) {
-      return;
-    }
-
-    const attempts = (window.__metaPixelFlushAttempts || 0) + 1;
-    window.__metaPixelFlushAttempts = attempts;
-
-    if (attempts >= MAX_FLUSH_ATTEMPTS) {
-      recordDebugEvent('flush_stopped', { attempts });
-      return;
-    }
-
-    window.__metaPixelFlushTimer = window.setTimeout(runFlush, FLUSH_INTERVAL_MS);
-  };
-
-  window.__metaPixelFlushTimer = window.setTimeout(runFlush, FLUSH_INTERVAL_MS);
-}
-
-function sendMetaPixelEvent(method, eventName, payload) {
+function sendMetaPixelEvent(method, eventName, payload = undefined) {
   if (!canUseMetaPixel()) {
     return false;
   }
 
-  ensureMetaPixelLoaded();
-  initializeMetaPixel(getCurrentAdvancedMatchingData());
-
-  const fbq = getMetaPixelFn();
-  const args = payload === undefined
-    ? [method, eventName]
-    : [method, eventName, payload];
-
-  if (fbq) {
-    fbq(...args);
-    if (isMetaPixelReady(fbq)) {
-      recordDebugEvent('event_sent', { method, eventName, payload: payload || null });
-      flushPendingCalls();
-      return true;
-    }
-
-    recordDebugEvent('event_queued', { method, eventName, payload: payload || null });
-    schedulePendingCallFlush();
+  const fbq = initializeMetaPixelBase();
+  if (!fbq) {
     return false;
   }
 
-  getPendingCalls().push(args);
-  window.__metaPixelFlushAttempts = 0;
-  schedulePendingCallFlush();
-  recordDebugEvent('event_queued', { method, eventName, payload: payload || null });
-  return false;
+  const normalizedPayload = payload && typeof payload === 'object' ? payload : undefined;
+  recordDebugEvent('event_firing', {
+    method,
+    eventName,
+    payload: normalizedPayload || null,
+    pixelId: PIXEL_ID,
+  });
+  logMetaPixel(`${eventName} firing`, normalizedPayload || null);
+
+  if (normalizedPayload) {
+    fbq(method, eventName, normalizedPayload);
+  } else {
+    fbq(method, eventName);
+  }
+
+  recordDebugEvent('event_called', {
+    method,
+    eventName,
+    payload: normalizedPayload || null,
+    pixelId: PIXEL_ID,
+  });
+  logMetaPixel(`${eventName} fbq called`, normalizedPayload || null);
+
+  sendMetaTestPing(eventName, normalizedPayload || null);
+  return true;
 }
 
 function normalizeEmail(value) {
@@ -447,16 +480,6 @@ async function hashValue(value) {
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
-}
-
-function normalizeNumber(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeQuantity(value) {
-  const parsed = normalizeNumber(value, 1);
-  return Math.max(Math.floor(parsed), 1);
 }
 
 function buildMetaContent(item = {}) {
@@ -505,14 +528,11 @@ function buildEventPayload(items, basePayload = {}) {
 
   const uniqueIds = Array.from(new Set(normalizedItems.map((item) => item.id)));
   const names = normalizedItems.map((item) => item.name);
-  const sizes = normalizedItems
-    .map((item) => item.size)
-    .filter(Boolean);
+  const sizes = normalizedItems.map((item) => item.size).filter(Boolean);
   const totalQuantity = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const payload = {
-    content_name:
-      names.length === 1 ? names[0] : names.slice(0, 5).join(', '),
+    content_name: names.length === 1 ? names[0] : names.slice(0, 5).join(', '),
     content_ids: uniqueIds,
     contents: normalizedItems.map((item) => item.content),
     content_type: 'product',
@@ -623,6 +643,10 @@ async function buildAdvancedMatchingData({ customer = null, shipping = null } = 
   );
 }
 
+export function ensureMetaPixelReady() {
+  return Boolean(initializeMetaPixelBase());
+}
+
 export function trackMetaPageView({ pathname, search = '' } = {}) {
   if (!canUseMetaPixel()) {
     return false;
@@ -648,16 +672,20 @@ export async function applyMetaAdvancedMatching(input = {}) {
   }
 
   const signature = JSON.stringify(userData);
-  if (signature === lastAdvancedMatchingSignature) {
+  if (signature === lastAdvancedMatchingSignature || signature === advancedMatchingSignature) {
     return false;
   }
 
-  lastAdvancedMatchingSignature = signature;
-  pendingAdvancedMatchingData = userData;
+  const fbq = initializeMetaPixelBase();
+  if (!fbq) {
+    return false;
+  }
 
-  ensureMetaPixelLoaded();
-  initializeMetaPixel(userData);
-  recordDebugEvent('advanced_matching_updated', { userData });
+  advancedMatchingSignature = signature;
+  lastAdvancedMatchingSignature = signature;
+
+  recordDebugEvent('advanced_matching_prepared', { pixelId: PIXEL_ID, userData });
+  logMetaPixel('Advanced matching prepared', userData);
   return true;
 }
 
@@ -698,6 +726,7 @@ export function trackMetaPurchase({
   const normalizedOrderId = normalizeString(orderId);
   if (normalizedOrderId && hasTrackedPurchase(normalizedOrderId)) {
     recordDebugEvent('purchase_skipped_duplicate', { orderId: normalizedOrderId });
+    logMetaPixel('Purchase skipped: duplicate', { orderId: normalizedOrderId });
     return false;
   }
 
@@ -706,6 +735,7 @@ export function trackMetaPurchase({
       orderId: normalizedOrderId,
       pathname: window.location.pathname,
     });
+    logMetaPixel('Purchase skipped: wrong page', { orderId: normalizedOrderId, pathname: window.location.pathname });
     return false;
   }
 

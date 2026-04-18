@@ -5,7 +5,11 @@ import {
   initializeAnalytics,
   trackPageView,
 } from '../lib/googleAnalytics';
-import { syncMetaDebugQueryParams, trackMetaPageView } from '../lib/metaPixel';
+import {
+  ensureMetaPixelReady,
+  syncMetaDebugQueryParams,
+  trackMetaPageView,
+} from '../lib/metaPixel';
 
 const AnalyticsTracker = () => {
   const { pathname, search } = useLocation();
@@ -18,6 +22,7 @@ const AnalyticsTracker = () => {
       initializeAnalytics();
     }
 
+    ensureMetaPixelReady();
     syncMetaDebugQueryParams();
 
     if (hasTrackedInitialPage.current && hasGoogleAnalytics) {
