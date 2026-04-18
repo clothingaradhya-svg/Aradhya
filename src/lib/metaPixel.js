@@ -8,6 +8,7 @@ const MAX_STORED_PURCHASE_IDS = 50;
 const PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID || '839123811919855';
 const PURCHASE_RUNTIME_TRACKED_KEY = '__aradhyaMetaPixelTrackedPurchases';
 const PURCHASE_RUNTIME_PENDING_KEY = '__aradhyaMetaPixelPendingPurchases';
+const DEFAULT_ALLOWED_META_HOSTS = ['thehouseofaradhya.com', 'www.thehouseofaradhya.com'];
 
 let lastTrackedPath = null;
 let lastAdvancedMatchingSignature = null;
@@ -15,7 +16,42 @@ let pixelInitialized = false;
 let advancedMatchingSignature = null;
 
 function canUseMetaPixel() {
-  return typeof window !== 'undefined' && typeof document !== 'undefined' && Boolean(PIXEL_ID);
+  return (
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined' &&
+    Boolean(PIXEL_ID) &&
+    isAllowedMetaHostname()
+  );
+}
+
+function getAllowedMetaHostnames() {
+  const configuredHosts = String(import.meta.env.VITE_META_PIXEL_ALLOWED_HOSTS || '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (configuredHosts.length > 0) {
+    return configuredHosts;
+  }
+
+  return DEFAULT_ALLOWED_META_HOSTS;
+}
+
+function isAllowedMetaHostname() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const hostname = String(window.location.hostname || '').trim().toLowerCase();
+  if (!hostname) {
+    return false;
+  }
+
+  if (['localhost', '127.0.0.1'].includes(hostname)) {
+    return true;
+  }
+
+  return getAllowedMetaHostnames().includes(hostname);
 }
 
 function normalizeString(value) {
@@ -375,14 +411,50 @@ function normalizeEmail(value) {
   return normalized ? normalized.toLowerCase() : null;
 }
 
-function normalizePhone(value) {
+function normalizeCountryCode(value) {
+  const normalized = normalizeString(value)?.toLowerCase() || null;
+  if (!normalized) {
+    return null;
+  }
+
+  if (['in', 'india'].includes(normalized)) {
+    return 'IN';
+  }
+
+  return normalized.toUpperCase();
+}
+
+function normalizePhone(value, country = null) {
   const normalized = normalizeString(value);
   if (!normalized) {
     return null;
   }
 
   const digitsOnly = normalized.replace(/\D/g, '');
-  return digitsOnly || null;
+  if (!digitsOnly) {
+    return null;
+  }
+
+  const normalizedCountry = normalizeCountryCode(country);
+  if (normalizedCountry === 'IN' || normalizedCountry === null) {
+    if (digitsOnly.length === 10) {
+      return `91${digitsOnly}`;
+    }
+
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+      return `91${digitsOnly.slice(1)}`;
+    }
+
+    if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+      return digitsOnly;
+    }
+  }
+
+  if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
+    return digitsOnly;
+  }
+
+  return null;
 }
 
 async function hashValue(value) {
@@ -667,7 +739,13 @@ async function buildAdvancedMatchingData({ customer = null, shipping = null } = 
     normalizeString(customer?.userId) ||
     null;
   const email = normalizeEmail(customer?.email) || normalizeEmail(shipping?.email);
-  const phone = normalizePhone(customer?.phone) || normalizePhone(shipping?.phone);
+  const country =
+    normalizeCountryCode(customer?.country) ||
+    normalizeCountryCode(shipping?.country) ||
+    'IN';
+  const phone =
+    normalizePhone(customer?.phone, country) ||
+    normalizePhone(shipping?.phone, country);
   const nameParts = getNameParts(customer?.name || shipping?.fullName);
 
   const normalizedData = {
