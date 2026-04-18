@@ -18,17 +18,12 @@ const AnalyticsTracker = () => {
       initializeAnalytics();
     }
 
-    // The initial page view is handled by the head-level analytics tags.
-    if (!hasTrackedInitialPage.current) {
-      hasTrackedInitialPage.current = true;
-      return;
-    }
-
-    if (hasGoogleAnalytics) {
+    if (hasTrackedInitialPage.current && hasGoogleAnalytics) {
       trackPageView({ pathname, search });
     }
 
     trackMetaPageView({ pathname, search });
+    hasTrackedInitialPage.current = true;
   }, [pathname, search]);
 
   return null;
