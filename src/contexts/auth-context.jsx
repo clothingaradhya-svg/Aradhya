@@ -14,6 +14,7 @@ import {
   isFirebaseGoogleConfigured,
   signInWithGooglePopup,
 } from '../lib/firebase';
+import { clearMetaAdvancedMatching } from '../lib/metaPixel';
 
 const AuthContext = createContext(null);
 
@@ -206,6 +207,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     clearToken();
+    clearMetaAdvancedMatching();
     setCustomer(null);
     setOrders([]);
     setError(null);

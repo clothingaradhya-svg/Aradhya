@@ -45,8 +45,27 @@
         s = b.getElementsByTagName(e)[0];
         s.parentNode.insertBefore(t, s);
       })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '839123811919855');
-      window.__aradhyaMetaPixelId = '839123811919855';
+      var pixelId = '839123811919855';
+      var advancedMatching = null;
+      try {
+        var rawAdvancedMatching = window.sessionStorage
+          ? window.sessionStorage.getItem('aradhya-meta-pixel-advanced-matching-v1')
+          : null;
+        advancedMatching = rawAdvancedMatching ? JSON.parse(rawAdvancedMatching) : null;
+      } catch (e) {
+        advancedMatching = null;
+      }
+      if (
+        advancedMatching &&
+        typeof advancedMatching === 'object' &&
+        !Array.isArray(advancedMatching) &&
+        Object.keys(advancedMatching).length > 0
+      ) {
+        fbq('init', pixelId, advancedMatching);
+      } else {
+        fbq('init', pixelId);
+      }
+      window.__aradhyaMetaPixelId = pixelId;
       window.__aradhyaMetaPixelBaseInitialized = true;
     </script>
     <title>Aradhya Designer Wear for Men in India</title>

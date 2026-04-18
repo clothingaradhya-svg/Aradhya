@@ -1,6 +1,7 @@
 const META_PIXEL_SCRIPT_ID = 'aradhya-meta-pixel-script';
 const META_PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 const PURCHASE_STORAGE_KEY = 'aradhya-meta-pixel-purchases-v1';
+const ADVANCED_MATCHING_STORAGE_KEY = 'aradhya-meta-pixel-advanced-matching-v1';
 const META_TEST_MODE_STORAGE_KEY = 'aradhya-meta-pixel-test-mode-v1';
 const META_TEST_CODE_STORAGE_KEY = 'aradhya-meta-pixel-test-code-v1';
 const MAX_STORED_PURCHASE_IDS = 50;
@@ -309,10 +310,26 @@ function initializeMetaPixelBase() {
   }
 
   if (!pixelInitialized) {
-    fbq('init', PIXEL_ID);
+    const advancedMatchingData =
+      (window.__aradhyaMetaPixelAdvancedMatchingData &&
+      typeof window.__aradhyaMetaPixelAdvancedMatchingData === 'object'
+        ? window.__aradhyaMetaPixelAdvancedMatchingData
+        : null) || readAdvancedMatchingFromStorage();
+
+    if (advancedMatchingData && Object.keys(advancedMatchingData).length > 0) {
+      fbq('init', PIXEL_ID, advancedMatchingData);
+      recordDebugEvent('init', { pixelId: PIXEL_ID, advancedMatching: true });
+      logMetaPixel('Pixel initialized with advanced matching', {
+        pixelId: PIXEL_ID,
+        userDataKeys: Object.keys(advancedMatchingData),
+      });
+    } else {
+      fbq('init', PIXEL_ID);
+      recordDebugEvent('init', { pixelId: PIXEL_ID, advancedMatching: false });
+      logMetaPixel('Pixel initialized', { pixelId: PIXEL_ID });
+    }
+
     markBaseInitialized();
-    recordDebugEvent('init', { pixelId: PIXEL_ID });
-    logMetaPixel('Pixel initialized', { pixelId: PIXEL_ID });
   }
 
   return fbq;
@@ -487,6 +504,63 @@ function getTrackedPurchaseIds() {
   return Array.from(purchaseIds).slice(0, MAX_STORED_PURCHASE_IDS);
 }
 
+function readAdvancedMatchingFromStorage() {
+  if (!canUseMetaPixel() || typeof window.sessionStorage === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(ADVANCED_MATCHING_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    const normalized = Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, value]) => [key, normalizeString(value)])
+        .filter(([, value]) => Boolean(value)),
+    );
+
+    return Object.keys(normalized).length ? normalized : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeAdvancedMatchingToStorage(userData) {
+  if (
+    !canUseMetaPixel() ||
+    typeof window.sessionStorage === 'undefined' ||
+    !userData ||
+    typeof userData !== 'object'
+  ) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(ADVANCED_MATCHING_STORAGE_KEY, JSON.stringify(userData));
+  } catch {
+    // Ignore storage failures for advanced matching.
+  }
+}
+
+export function clearMetaAdvancedMatching() {
+  if (!canUseMetaPixel() || typeof window.sessionStorage === 'undefined') {
+    return false;
+  }
+
+  try {
+    window.sessionStorage.removeItem(ADVANCED_MATCHING_STORAGE_KEY);
+    delete window.__aradhyaMetaPixelAdvancedMatchingData;
+    advancedMatchingSignature = null;
+    lastAdvancedMatchingSignature = null;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getPurchaseRegistry(key) {
   if (!canUseMetaPixel()) {
     return new Set();
@@ -659,6 +733,7 @@ export async function applyMetaAdvancedMatching(input = {}) {
   advancedMatchingSignature = signature;
   lastAdvancedMatchingSignature = signature;
   window.__aradhyaMetaPixelAdvancedMatchingData = userData;
+  writeAdvancedMatchingToStorage(userData);
 
   recordDebugEvent('advanced_matching_prepared', { pixelId: PIXEL_ID, userData });
   logMetaPixel('Advanced matching prepared', userData);
