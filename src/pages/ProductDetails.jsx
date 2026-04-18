@@ -35,7 +35,7 @@ import {
   normaliseTokenValue,
   searchProducts,
 } from '../lib/api';
-import { trackMetaAddToCart } from '../lib/metaPixel';
+import { appendMetaDebugParams, trackMetaAddToCart } from '../lib/metaPixel';
 import { SITE_URL, stripHtml, TARGET_KEYWORDS } from '../lib/seo';
 
 const AccordionItem = ({ title, isOpen, onClick, children }) => (
@@ -763,7 +763,7 @@ const ProductDetails = () => {
       value: Number(selectedVariant?.price ?? product?.price ?? 0),
       currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
     });
-    navigate('/cart');
+    navigate(appendMetaDebugParams('/cart'));
   };
 
   const handleOpenSizeChart = () => {
@@ -875,7 +875,7 @@ const ProductDetails = () => {
 
     // Close & redirect after cart updates.
     setShowSizeModal(false);
-    navigate('/cart');
+    navigate(appendMetaDebugParams('/cart'));
   };
 
   useEffect(() => {

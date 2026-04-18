@@ -21,6 +21,7 @@ import {
   getCheckoutDraft,
   setCheckoutDraft,
 } from '../lib/checkout';
+import { appendMetaDebugParams } from '../lib/metaPixel';
 
 const PAYMENT_METHODS = [
   {
@@ -110,12 +111,12 @@ export default function Payment() {
   useEffect(() => {
     const currentDraft = getCheckoutDraft();
     if (!currentDraft?.items?.length) {
-      navigate('/cart', { replace: true });
+      navigate(appendMetaDebugParams('/cart'), { replace: true });
       return;
     }
 
     if (!currentDraft?.shipping) {
-      navigate('/checkout/address', { replace: true });
+      navigate(appendMetaDebugParams('/checkout/address'), { replace: true });
       return;
     }
 
@@ -269,7 +270,7 @@ export default function Payment() {
       await refreshCustomer();
     }
 
-    navigate('/checkout/success', {
+    navigate(appendMetaDebugParams('/checkout/success'), {
       replace: true,
       state: {
         order,
@@ -310,14 +311,14 @@ export default function Payment() {
     setError('');
 
     if (!isAuthenticated) {
-      navigate('/login?redirect=/checkout/payment');
+      navigate(appendMetaDebugParams('/login?redirect=/checkout/payment'));
       return;
     }
 
     const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
     if (!token) {
       setError('Session expired. Please log in again.');
-      navigate('/login?redirect=/checkout/payment');
+      navigate(appendMetaDebugParams('/login?redirect=/checkout/payment'));
       return;
     }
 
@@ -451,7 +452,7 @@ export default function Payment() {
           </p>
           <p className="mt-1 text-sm text-gray-600">{draft.shipping?.phone}</p>
           <Link
-            to="/checkout/address"
+            to={appendMetaDebugParams('/checkout/address')}
             className="mt-3 inline-flex text-xs font-semibold text-black hover:underline"
           >
             Change address

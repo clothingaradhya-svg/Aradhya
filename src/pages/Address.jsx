@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, MapPin, Plus, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatMoney } from '../lib/api';
 import { useAuth } from '../contexts/auth-context';
+import { appendMetaDebugParams } from '../lib/metaPixel';
 import {
   getCheckoutDraft,
   getEmptyShippingAddress,
@@ -58,7 +59,7 @@ export default function Address() {
   useEffect(() => {
     const currentDraft = getCheckoutDraft();
     if (!currentDraft?.items?.length) {
-      navigate('/cart', { replace: true });
+      navigate(appendMetaDebugParams('/cart'), { replace: true });
       return;
     }
 
@@ -198,7 +199,7 @@ export default function Address() {
       updatedAt: new Date().toISOString(),
     };
     setCheckoutDraft(nextDraft);
-    navigate('/checkout/payment');
+    navigate(appendMetaDebugParams('/checkout/payment'));
   };
 
   if (!draft) {

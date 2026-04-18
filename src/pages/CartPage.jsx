@@ -10,7 +10,7 @@ import {
   isSizeOptionName,
 } from '../lib/api';
 import { setCheckoutDraft } from '../lib/checkout';
-import { trackMetaInitiateCheckout } from '../lib/metaPixel';
+import { appendMetaDebugParams, trackMetaInitiateCheckout } from '../lib/metaPixel';
 import { useCatalog } from '../contexts/catalog-context';
 import { useWishlist } from '../contexts/wishlist-context';
 import { useNotifications } from '../components/NotificationProvider';
@@ -298,7 +298,7 @@ const CartPage = () => {
         currency,
       });
 
-      navigate('/checkout/address');
+      navigate(appendMetaDebugParams('/checkout/address'));
     } catch (error) {
       console.error('Checkout failed', error);
       setCheckoutError(

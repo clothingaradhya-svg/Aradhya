@@ -137,6 +137,36 @@ export function syncMetaDebugQueryParams() {
   return true;
 }
 
+export function appendMetaDebugParams(path) {
+  const target = String(path || '').trim();
+  if (!target) {
+    return target;
+  }
+
+  if (!canUseMetaPixel()) {
+    return target;
+  }
+
+  const isAbsolute = /^https?:\/\//i.test(target);
+  const base = isAbsolute ? undefined : window.location.origin;
+  const url = new URL(target, base);
+
+  if (isMetaTestModeEnabled()) {
+    url.searchParams.set('meta_test', '1');
+  }
+
+  const testCode = getMetaTestCode();
+  if (testCode) {
+    url.searchParams.set('meta_test_code', testCode);
+  }
+
+  if (isAbsolute) {
+    return url.toString();
+  }
+
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 function getMetaPixelFn() {
   if (typeof window.fbq === 'function') {
     return window.fbq;
