@@ -104,6 +104,39 @@ function getMetaTestCode() {
   }
 }
 
+export function syncMetaDebugQueryParams() {
+  if (!canUseMetaPixel()) {
+    return false;
+  }
+
+  const params = getUrlSearchParams();
+  if (!params) {
+    return false;
+  }
+
+  let changed = false;
+
+  if (isMetaTestModeEnabled() && params.get('meta_test') !== '1') {
+    params.set('meta_test', '1');
+    changed = true;
+  }
+
+  const testCode = getMetaTestCode();
+  if (testCode && params.get('meta_test_code') !== testCode) {
+    params.set('meta_test_code', testCode);
+    changed = true;
+  }
+
+  if (!changed) {
+    return false;
+  }
+
+  const nextSearch = params.toString();
+  const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState(window.history.state, '', nextUrl);
+  return true;
+}
+
 function getMetaPixelFn() {
   if (typeof window.fbq === 'function') {
     return window.fbq;
