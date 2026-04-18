@@ -9,6 +9,7 @@ import {
   getProductImageUrl,
   isSizeOptionName,
 } from '../lib/api';
+import { trackBeginCheckout } from '../lib/googleAnalytics';
 import { setCheckoutDraft } from '../lib/checkout';
 import { appendMetaDebugParams, trackMetaInitiateCheckout } from '../lib/metaPixel';
 import { useCatalog } from '../contexts/catalog-context';
@@ -294,6 +295,10 @@ const CartPage = () => {
       });
 
       trackMetaInitiateCheckout(checkoutItems, {
+        value: subtotal,
+        currency,
+      });
+      trackBeginCheckout(checkoutItems, {
         value: subtotal,
         currency,
       });

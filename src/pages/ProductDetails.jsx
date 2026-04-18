@@ -35,6 +35,7 @@ import {
   normaliseTokenValue,
   searchProducts,
 } from '../lib/api';
+import { trackAddToCart } from '../lib/googleAnalytics';
 import { appendMetaDebugParams, trackMetaAddToCart } from '../lib/metaPixel';
 import { SITE_URL, stripHtml, TARGET_KEYWORDS } from '../lib/seo';
 
@@ -757,11 +758,15 @@ const ProductDetails = () => {
       return;
     }
 
-    // Otherwise, just add main product and go to cart
-    addItem(product.handle, { size: primarySize, quantity: 1 });
-    trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
-      value: Number(selectedVariant?.price ?? product?.price ?? 0),
-      currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+      // Otherwise, just add main product and go to cart
+      addItem(product.handle, { size: primarySize, quantity: 1 });
+      trackAddToCart(buildMetaCartItem(product, primarySize, 1), {
+        value: Number(selectedVariant?.price ?? product?.price ?? 0),
+        currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+      });
+      trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
+        value: Number(selectedVariant?.price ?? product?.price ?? 0),
+        currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
     });
     navigate(appendMetaDebugParams('/cart'));
   };
@@ -854,22 +859,30 @@ const ProductDetails = () => {
         addItem(handle, { size, quantity: quantity ?? 1 });
       });
 
-      if (metaItems.length) {
-        const totalValue = metaItems.reduce(
-          (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-          0,
-        );
-        trackMetaAddToCart(metaItems, {
-          value: totalValue,
-          currency: metaItems[0]?.currency || 'INR',
+        if (metaItems.length) {
+          const totalValue = metaItems.reduce(
+            (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+            0,
+          );
+          trackAddToCart(metaItems, {
+            value: totalValue,
+            currency: metaItems[0]?.currency || 'INR',
+          });
+          trackMetaAddToCart(metaItems, {
+            value: totalValue,
+            currency: metaItems[0]?.currency || 'INR',
         });
       }
-    } else {
-      // Add the main product for single-product pages.
-      addItem(product.handle, { size: primarySize, quantity: 1 });
-      trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
-        value: Number(selectedVariant?.price ?? product?.price ?? 0),
-        currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+      } else {
+        // Add the main product for single-product pages.
+        addItem(product.handle, { size: primarySize, quantity: 1 });
+        trackAddToCart(buildMetaCartItem(product, primarySize, 1), {
+          value: Number(selectedVariant?.price ?? product?.price ?? 0),
+          currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+        });
+        trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
+          value: Number(selectedVariant?.price ?? product?.price ?? 0),
+          currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
       });
     }
 

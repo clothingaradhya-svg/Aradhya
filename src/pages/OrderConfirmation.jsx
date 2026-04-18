@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { CheckCircle, Package, Truck, Home } from 'lucide-react';
+import { trackPurchase } from '../lib/googleAnalytics';
 import { applyMetaAdvancedMatching, trackMetaPurchase } from '../lib/metaPixel';
 
 const OrderConfirmation = () => {
@@ -67,6 +68,13 @@ const OrderConfirmation = () => {
 
       trackMetaPurchase({
         orderId: order?.id || order?.number || order?._id || null,
+        value: purchaseValue,
+        currency: purchaseCurrency,
+        items: purchaseItems,
+      });
+
+      trackPurchase({
+        transactionId: order?.id || order?.number || order?._id || null,
         value: purchaseValue,
         currency: purchaseCurrency,
         items: purchaseItems,
