@@ -5,6 +5,15 @@ function normalizeString(value) {
   return normalized || null;
 }
 
+function normalizeEmail(value) {
+  const normalized = normalizeString(value)?.toLowerCase() || null;
+  if (!normalized) {
+    return null;
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : null;
+}
+
 function normalizeCountryCode(value) {
   const normalized = normalizeString(value)?.toLowerCase() || null;
   if (!normalized) {
@@ -115,9 +124,11 @@ function buildMetaHashedArray(value) {
   return hashedValue ? [hashedValue] : undefined;
 }
 
-function buildMetaUserData({ phone = null, country = "IN" } = {}) {
+function buildMetaUserData({ email = null, phone = null, country = "IN" } = {}) {
+  const normalizedEmail = normalizeEmail(email);
   const normalizedPhone = normalizePhoneToMetaE164(phone, country);
   return compactMetaObject({
+    em: buildMetaHashedArray(normalizedEmail),
     ph: buildMetaHashedArray(normalizedPhone),
   });
 }
@@ -126,6 +137,7 @@ module.exports = {
   buildMetaUserData,
   buildMetaHashedArray,
   compactMetaObject,
+  normalizeEmail,
   normalizePhoneToMetaE164,
   sha256Hex,
 };

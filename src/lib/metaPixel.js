@@ -371,7 +371,7 @@ function initializeMetaPixelBase() {
   return fbq;
 }
 
-function sendMetaPixelEvent(method, eventName, payload = undefined) {
+function sendMetaPixelEvent(method, eventName, payload = undefined, options = undefined) {
   if (!canUseMetaPixel()) {
     return false;
   }
@@ -382,16 +382,22 @@ function sendMetaPixelEvent(method, eventName, payload = undefined) {
   }
 
   const normalizedPayload = payload && typeof payload === 'object' ? payload : undefined;
+  const normalizedOptions = options && typeof options === 'object' ? options : undefined;
   recordDebugEvent('event_firing', {
     method,
     eventName,
     payload: normalizedPayload || null,
+    options: normalizedOptions || null,
     pixelId: PIXEL_ID,
   });
   logMetaPixel(`${eventName} firing`, normalizedPayload || null);
 
-  if (normalizedPayload) {
+  if (normalizedPayload && normalizedOptions) {
+    fbq(method, eventName, normalizedPayload, normalizedOptions);
+  } else if (normalizedPayload) {
     fbq(method, eventName, normalizedPayload);
+  } else if (normalizedOptions) {
+    fbq(method, eventName, undefined, normalizedOptions);
   } else {
     fbq(method, eventName);
   }
@@ -400,6 +406,7 @@ function sendMetaPixelEvent(method, eventName, payload = undefined) {
     method,
     eventName,
     payload: normalizedPayload || null,
+    options: normalizedOptions || null,
     pixelId: PIXEL_ID,
   });
   logMetaPixel(`${eventName} fbq called`, normalizedPayload || null);
@@ -852,6 +859,7 @@ export function trackMetaInitiateCheckout(items, { value, currency = 'INR' } = {
 
 export function trackMetaPurchase({
   orderId,
+  eventId,
   value,
   currency = 'INR',
   items,
@@ -892,7 +900,12 @@ export function trackMetaPurchase({
     markPurchasePending(normalizedOrderId);
   }
 
-  const sent = sendMetaPixelEvent('track', 'Purchase', payload);
+  const sent = sendMetaPixelEvent(
+    'track',
+    'Purchase',
+    payload,
+    eventId ? { eventID: eventId } : undefined,
+  );
   if (sent && normalizedOrderId && canUseMetaPixel()) {
     markPurchaseTracked(normalizedOrderId);
   } else if (normalizedOrderId) {

@@ -11,6 +11,11 @@ const OrderConfirmation = () => {
   const awb = String(
     order?.shipping?.awbCode || order?.shipping?.awb || order?.shipping?.trackingNumber || '',
   ).trim();
+  const metaPurchaseEventId =
+    order?.metaPurchaseEventId ||
+    order?.metaTracking?.purchaseEventId ||
+    order?.shipping?.metaTracking?.purchaseEventId ||
+    null;
 
   const purchaseItems = useMemo(() => {
     const candidates = Array.isArray(order?.items)
@@ -57,6 +62,7 @@ const OrderConfirmation = () => {
     (async () => {
       console.info('[Meta Pixel] Purchase event firing', {
         orderId: order?.id || order?.number || order?._id || null,
+        eventId: metaPurchaseEventId,
         value: purchaseValue,
         currency: purchaseCurrency,
       });
@@ -68,6 +74,7 @@ const OrderConfirmation = () => {
 
       trackMetaPurchase({
         orderId: order?.id || order?.number || order?._id || null,
+        eventId: metaPurchaseEventId,
         value: purchaseValue,
         currency: purchaseCurrency,
         items: purchaseItems,
@@ -86,7 +93,7 @@ const OrderConfirmation = () => {
         items: purchaseItems,
       });
     })();
-  }, [order, purchaseCurrency, purchaseItems, purchaseValue]);
+  }, [metaPurchaseEventId, order, purchaseCurrency, purchaseItems, purchaseValue]);
 
   if (!order) {
     return <Navigate to="/orders" replace />;

@@ -5,6 +5,7 @@ const { getPrisma } = require("../db/prismaClient");
 const { OrderStatus, OrderRequestType } = require("@prisma/client");
 const { sendSuccess, sendError } = require("../utils/response");
 const orderShippingService = require("../services/orderShipping.service");
+const metaConversionsApiService = require("../services/metaConversionsApi.service");
 const razorpayService = require("../services/razorpay.service");
 const shiprocketService = require("../services/shiprocket.service");
 const {
@@ -139,17 +140,25 @@ const confirmRazorpayCheckoutSchema = z.object({
 
 const sanitizeOrder = (order) => {
   if (!order) return null;
+  const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
+  const metaTracking =
+    shipping?.metaTracking && typeof shipping.metaTracking === "object"
+      ? shipping.metaTracking
+      : null;
+
   return {
     id: order.id,
     number: order.number,
     status: order.status,
     paymentMethod: order.paymentMethod,
     totals: order.totals,
-    shipping: order.shipping,
+    shipping,
     items: order.items,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     userId: order.userId,
+    metaTracking,
+    metaPurchaseEventId: metaTracking?.purchaseEventId || null,
   };
 };
 
@@ -413,6 +422,41 @@ const tryProvisionShiprocketShipment = async (prisma, order) => {
     } catch {
       return order;
     }
+  }
+};
+
+const trySendMetaPurchaseEvent = async (prisma, order) => {
+  try {
+    const result = await metaConversionsApiService.sendPurchaseEvent(order);
+    if (!result?.shippingPatch) {
+      return {
+        order,
+        metaCapi: result || null,
+      };
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        shipping: result.shippingPatch,
+      },
+    });
+
+    return {
+      order: updated,
+      metaCapi: result,
+    };
+  } catch (error) {
+    console.error("[Meta CAPI] Unexpected purchase send error:", error);
+    return {
+      order,
+      metaCapi: {
+        enabled: metaConversionsApiService.isMetaCapiPurchaseEnabled(),
+        skipped: true,
+        reason: "unexpected_error",
+        eventId: metaConversionsApiService.buildMetaPurchaseEventId(order),
+      },
+    };
   }
 };
 
@@ -981,7 +1025,26 @@ exports.createCheckoutOrder = async (req, res, next) => {
     });
 
     const orderWithShipment = await tryProvisionShiprocketShipment(prisma, created);
-    return sendSuccess(res, sanitizeOrder(orderWithShipment), null, "Order created successfully.");
+    const { order: orderWithMetaTracking, metaCapi } = await trySendMetaPurchaseEvent(
+      prisma,
+      orderWithShipment,
+    );
+
+    return sendSuccess(
+      res,
+      sanitizeOrder(orderWithMetaTracking),
+      {
+        metaCapi: metaCapi
+          ? {
+              enabled: Boolean(metaCapi.enabled),
+              skipped: Boolean(metaCapi.skipped),
+              reason: metaCapi.reason || null,
+              eventId: metaCapi.eventId || null,
+            }
+          : null,
+      },
+      "Order created successfully.",
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, 400, error.errors[0]?.message || "Invalid payload");

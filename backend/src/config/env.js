@@ -8,6 +8,14 @@ const toNumber = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toBoolean = (value, fallback = false) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+};
+
 const env = {
   port: Number(process.env.PORT || 5001),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -28,6 +36,11 @@ const env = {
   shiprocketDefaultLength: toNumber(process.env.SHIPROCKET_DEFAULT_LENGTH, 10),
   shiprocketDefaultBreadth: toNumber(process.env.SHIPROCKET_DEFAULT_BREADTH, 10),
   shiprocketDefaultHeight: toNumber(process.env.SHIPROCKET_DEFAULT_HEIGHT, 10),
+  metaCapiEnabled: toBoolean(process.env.META_CAPI_ENABLED, false),
+  metaCapiPixelId: String(process.env.META_CAPI_PIXEL_ID || "").trim(),
+  metaCapiAccessToken: String(process.env.META_CAPI_ACCESS_TOKEN || "").trim(),
+  metaCapiTestEventCode: String(process.env.META_CAPI_TEST_EVENT_CODE || "").trim(),
+  metaCapiApiVersion: String(process.env.META_CAPI_API_VERSION || "v22.0").trim() || "v22.0",
 };
 
 module.exports = { env };
