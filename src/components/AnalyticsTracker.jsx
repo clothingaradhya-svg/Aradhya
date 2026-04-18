@@ -31,9 +31,15 @@ const AnalyticsTracker = () => {
     }
 
     trackMetaPageView({ pathname, search });
-
-    flushPendingAnalyticsEvents();
     hasTrackedInitialPage.current = true;
+
+    const flushTimer = window.setTimeout(() => {
+      flushPendingAnalyticsEvents();
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(flushTimer);
+    };
   }, [pathname, search]);
 
   return null;
