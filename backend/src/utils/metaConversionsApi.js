@@ -63,19 +63,69 @@ function sha256Hex(value) {
   return crypto.createHash("sha256").update(normalized).digest("hex");
 }
 
-function buildMetaUserData({ phone = null, country = "IN" } = {}) {
-  const userData = {};
-  const normalizedPhone = normalizePhoneToMetaE164(phone, country);
+function compactMetaObject(value) {
+  if (Array.isArray(value)) {
+    const normalizedItems = value
+      .filter((entry) => entry !== null && entry !== undefined)
+      .map((entry) => (typeof entry === "object" ? compactMetaObject(entry) : entry))
+      .filter((entry) => {
+        if (entry === null || entry === undefined) {
+          return false;
+        }
 
-  if (normalizedPhone) {
-    userData.ph = sha256Hex(normalizedPhone);
+        if (Array.isArray(entry)) {
+          return entry.length > 0;
+        }
+
+        if (typeof entry === "object") {
+          return Object.keys(entry).length > 0;
+        }
+
+        return true;
+      });
+
+    return normalizedItems;
   }
 
-  return userData;
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => {
+      if (entry === null || entry === undefined) {
+        return false;
+      }
+
+      if (Array.isArray(entry)) {
+        return compactMetaObject(entry).length > 0;
+      }
+
+      if (typeof entry === "object") {
+        return Object.keys(compactMetaObject(entry)).length > 0;
+      }
+
+      return true;
+    }).map(([key, entry]) => [key, typeof entry === "object" ? compactMetaObject(entry) : entry]),
+  );
+}
+
+function buildMetaHashedArray(value) {
+  const hashedValue = sha256Hex(value);
+  return hashedValue ? [hashedValue] : undefined;
+}
+
+function buildMetaUserData({ phone = null, country = "IN" } = {}) {
+  const normalizedPhone = normalizePhoneToMetaE164(phone, country);
+  return compactMetaObject({
+    ph: buildMetaHashedArray(normalizedPhone),
+  });
 }
 
 module.exports = {
   buildMetaUserData,
+  buildMetaHashedArray,
+  compactMetaObject,
   normalizePhoneToMetaE164,
   sha256Hex,
 };
