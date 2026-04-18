@@ -1,11 +1,95 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { CheckCircle, Package, Truck, Home } from 'lucide-react';
 import { trackPurchase } from '../lib/googleAnalytics';
 import { applyMetaAdvancedMatching, trackMetaPurchase } from '../lib/metaPixel';
 
+const PURCHASE_EFFECT_STORAGE_KEY = 'aradhya-browser-purchase-fired-v1';
+
+const normalizePurchaseKey = (value) => {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+};
+
+const getPurchaseRuntimeRegistry = () => {
+  if (typeof window === 'undefined') {
+    return new Set();
+  }
+
+  if (window.__aradhyaBrowserPurchaseFired instanceof Set) {
+    return window.__aradhyaBrowserPurchaseFired;
+  }
+
+  const registry = new Set(
+    Array.isArray(window.__aradhyaBrowserPurchaseFired)
+      ? window.__aradhyaBrowserPurchaseFired
+      : [],
+  );
+  window.__aradhyaBrowserPurchaseFired = registry;
+  return registry;
+};
+
+const readPurchaseKeysFromStorage = (storage) => {
+  if (!storage) {
+    return [];
+  }
+
+  try {
+    const raw = storage.getItem(PURCHASE_EFFECT_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.map((entry) => normalizePurchaseKey(entry)).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const writePurchaseKeyToStorage = (storage, purchaseKey) => {
+  if (!storage || !purchaseKey) {
+    return;
+  }
+
+  const nextKeys = [
+    purchaseKey,
+    ...readPurchaseKeysFromStorage(storage).filter((entry) => entry !== purchaseKey),
+  ].slice(0, 50);
+
+  try {
+    storage.setItem(PURCHASE_EFFECT_STORAGE_KEY, JSON.stringify(nextKeys));
+  } catch {
+    // Ignore storage write failures for the browser purchase guard.
+  }
+};
+
+const hasStartedBrowserPurchase = (purchaseKey) => {
+  if (!purchaseKey || typeof window === 'undefined') {
+    return false;
+  }
+
+  if (getPurchaseRuntimeRegistry().has(purchaseKey)) {
+    return true;
+  }
+
+  return (
+    readPurchaseKeysFromStorage(window.sessionStorage).includes(purchaseKey) ||
+    readPurchaseKeysFromStorage(window.localStorage).includes(purchaseKey)
+  );
+};
+
+const markBrowserPurchaseStarted = (purchaseKey) => {
+  if (!purchaseKey || typeof window === 'undefined') {
+    return;
+  }
+
+  getPurchaseRuntimeRegistry().add(purchaseKey);
+  writePurchaseKeyToStorage(window.sessionStorage, purchaseKey);
+  writePurchaseKeyToStorage(window.localStorage, purchaseKey);
+};
+
 const OrderConfirmation = () => {
   const location = useLocation();
+  const purchaseEffectStartedRef = useRef(false);
   const order = location.state?.order || null;
   const orderNumber = location.state?.orderNumber || order?.number || '';
   const awb = String(
@@ -16,6 +100,11 @@ const OrderConfirmation = () => {
     order?.metaTracking?.purchaseEventId ||
     order?.shipping?.metaTracking?.purchaseEventId ||
     null;
+  const purchaseTrackingKey =
+    normalizePurchaseKey(order?.id) ||
+    normalizePurchaseKey(order?.number) ||
+    normalizePurchaseKey(order?._id) ||
+    normalizePurchaseKey(metaPurchaseEventId);
 
   const purchaseItems = useMemo(() => {
     const candidates = Array.isArray(order?.items)
@@ -58,11 +147,19 @@ const OrderConfirmation = () => {
 
   useEffect(() => {
     if (!order) return;
+    if (!purchaseTrackingKey) return;
+    if (purchaseEffectStartedRef.current || hasStartedBrowserPurchase(purchaseTrackingKey)) {
+      return;
+    }
+
+    purchaseEffectStartedRef.current = true;
+    markBrowserPurchaseStarted(purchaseTrackingKey);
 
     (async () => {
       console.info('[Meta Pixel] Purchase event firing', {
         orderId: order?.id || order?.number || order?._id || null,
         eventId: metaPurchaseEventId,
+        purchaseTrackingKey,
         value: purchaseValue,
         currency: purchaseCurrency,
       });
@@ -93,7 +190,7 @@ const OrderConfirmation = () => {
         items: purchaseItems,
       });
     })();
-  }, [metaPurchaseEventId, order, purchaseCurrency, purchaseItems, purchaseValue]);
+  }, [metaPurchaseEventId, order, purchaseCurrency, purchaseItems, purchaseTrackingKey, purchaseValue]);
 
   if (!order) {
     return <Navigate to="/orders" replace />;
