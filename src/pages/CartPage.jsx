@@ -298,10 +298,19 @@ const CartPage = () => {
         value: subtotal,
         currency,
       });
-      trackBeginCheckout(checkoutItems, {
+      console.info('[GA4] begin_checkout event firing', {
         value: subtotal,
         currency,
+        items: checkoutItems,
       });
+      trackBeginCheckout(
+        checkoutItems,
+        {
+          value: subtotal,
+          currency,
+        },
+        { deferUntilNextPage: true },
+      );
 
       navigate(appendMetaDebugParams('/checkout/address'));
     } catch (error) {

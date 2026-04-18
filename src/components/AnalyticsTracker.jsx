@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
+  flushPendingAnalyticsEvents,
   getAnalyticsMeasurementId,
   initializeAnalytics,
   trackPageView,
@@ -30,6 +31,8 @@ const AnalyticsTracker = () => {
     }
 
     trackMetaPageView({ pathname, search });
+
+    flushPendingAnalyticsEvents();
     hasTrackedInitialPage.current = true;
   }, [pathname, search]);
 

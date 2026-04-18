@@ -73,6 +73,12 @@ const OrderConfirmation = () => {
         items: purchaseItems,
       });
 
+      console.info('[GA4] purchase event firing', {
+        transactionId: order?.id || order?.number || order?._id || null,
+        value: purchaseValue,
+        currency: purchaseCurrency,
+        items: purchaseItems,
+      });
       trackPurchase({
         transactionId: order?.id || order?.number || order?._id || null,
         value: purchaseValue,

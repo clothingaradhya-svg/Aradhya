@@ -758,15 +758,29 @@ const ProductDetails = () => {
       return;
     }
 
-      // Otherwise, just add main product and go to cart
-      addItem(product.handle, { size: primarySize, quantity: 1 });
-      trackAddToCart(buildMetaCartItem(product, primarySize, 1), {
-        value: Number(selectedVariant?.price ?? product?.price ?? 0),
-        currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
-      });
-      trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
-        value: Number(selectedVariant?.price ?? product?.price ?? 0),
-        currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+    const analyticsItem = buildMetaCartItem(product, primarySize, 1);
+    const analyticsValue = Number(selectedVariant?.price ?? product?.price ?? 0);
+    const analyticsCurrency =
+      selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR';
+
+    // Otherwise, just add main product and go to cart
+    addItem(product.handle, { size: primarySize, quantity: 1 });
+    console.info('[GA4] add_to_cart event firing', {
+      value: analyticsValue,
+      currency: analyticsCurrency,
+      items: analyticsItem ? [analyticsItem] : [],
+    });
+    trackAddToCart(
+      analyticsItem,
+      {
+        value: analyticsValue,
+        currency: analyticsCurrency,
+      },
+      { deferUntilNextPage: true },
+    );
+    trackMetaAddToCart(analyticsItem, {
+      value: analyticsValue,
+      currency: analyticsCurrency,
     });
     navigate(appendMetaDebugParams('/cart'));
   };
@@ -859,30 +873,55 @@ const ProductDetails = () => {
         addItem(handle, { size, quantity: quantity ?? 1 });
       });
 
-        if (metaItems.length) {
-          const totalValue = metaItems.reduce(
-            (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-            0,
-          );
-          trackAddToCart(metaItems, {
+      if (metaItems.length) {
+        const totalValue = metaItems.reduce(
+          (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+          0,
+        );
+        const totalCurrency = metaItems[0]?.currency || 'INR';
+
+        console.info('[GA4] add_to_cart event firing', {
+          value: totalValue,
+          currency: totalCurrency,
+          items: metaItems,
+        });
+        trackAddToCart(
+          metaItems,
+          {
             value: totalValue,
-            currency: metaItems[0]?.currency || 'INR',
-          });
-          trackMetaAddToCart(metaItems, {
-            value: totalValue,
-            currency: metaItems[0]?.currency || 'INR',
+            currency: totalCurrency,
+          },
+          { deferUntilNextPage: true },
+        );
+        trackMetaAddToCart(metaItems, {
+          value: totalValue,
+          currency: totalCurrency,
         });
       }
-      } else {
-        // Add the main product for single-product pages.
-        addItem(product.handle, { size: primarySize, quantity: 1 });
-        trackAddToCart(buildMetaCartItem(product, primarySize, 1), {
-          value: Number(selectedVariant?.price ?? product?.price ?? 0),
-          currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
-        });
-        trackMetaAddToCart(buildMetaCartItem(product, primarySize, 1), {
-          value: Number(selectedVariant?.price ?? product?.price ?? 0),
-          currency: selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR',
+    } else {
+      const analyticsItem = buildMetaCartItem(product, primarySize, 1);
+      const analyticsValue = Number(selectedVariant?.price ?? product?.price ?? 0);
+      const analyticsCurrency =
+        selectedVariant?.currencyCode ?? product?.currencyCode ?? 'INR';
+
+      // Add the main product for single-product pages.
+      addItem(product.handle, { size: primarySize, quantity: 1 });
+      console.info('[GA4] add_to_cart event firing', {
+        value: analyticsValue,
+        currency: analyticsCurrency,
+        items: analyticsItem ? [analyticsItem] : [],
+      });
+      trackAddToCart(
+        analyticsItem,
+        {
+          value: analyticsValue,
+          currency: analyticsCurrency,
+        },
+        { deferUntilNextPage: true },
+      );
+      trackMetaAddToCart(analyticsItem, {
+        value: analyticsValue,
+        currency: analyticsCurrency,
       });
     }
 
