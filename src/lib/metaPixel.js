@@ -1,11 +1,12 @@
 const META_PIXEL_SCRIPT_ID = 'aradhya-meta-pixel-script';
 const META_PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
-const META_PIXEL_REQUEST_URL = 'https://www.facebook.com/tr/';
 const PURCHASE_STORAGE_KEY = 'aradhya-meta-pixel-purchases-v1';
 const META_TEST_MODE_STORAGE_KEY = 'aradhya-meta-pixel-test-mode-v1';
 const META_TEST_CODE_STORAGE_KEY = 'aradhya-meta-pixel-test-code-v1';
 const MAX_STORED_PURCHASE_IDS = 50;
 const PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID || '839123811919855';
+const PURCHASE_RUNTIME_TRACKED_KEY = '__aradhyaMetaPixelTrackedPurchases';
+const PURCHASE_RUNTIME_PENDING_KEY = '__aradhyaMetaPixelPendingPurchases';
 
 let lastTrackedPath = null;
 let lastAdvancedMatchingSignature = null;
@@ -61,14 +62,6 @@ function getDebugEvents() {
   return window.__metaPixelDebugEvents;
 }
 
-function getNetworkEvents() {
-  if (!Array.isArray(window.__metaPixelNetworkEvents)) {
-    window.__metaPixelNetworkEvents = [];
-  }
-
-  return window.__metaPixelNetworkEvents;
-}
-
 function logMetaPixel(message, detail = null) {
   if (detail !== null && detail !== undefined) {
     console.info(`[Meta Pixel] ${message}`, detail);
@@ -108,25 +101,6 @@ function recordDebugEvent(type, detail = {}) {
 
   if (getDebugEvents().length > 200) {
     getDebugEvents().shift();
-  }
-}
-
-function recordNetworkEvent(type, detail = {}) {
-  if (!canUseMetaPixel()) {
-    return;
-  }
-
-  const entry = {
-    type,
-    detail,
-    url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
-    timestamp: new Date().toISOString(),
-  };
-
-  getNetworkEvents().push(entry);
-
-  if (getNetworkEvents().length > 200) {
-    getNetworkEvents().shift();
   }
 }
 
@@ -344,68 +318,6 @@ function initializeMetaPixelBase() {
   return fbq;
 }
 
-function buildTestPingUrl(eventName, payload = null) {
-  const params = new URLSearchParams();
-  params.set('id', PIXEL_ID);
-  params.set('ev', eventName);
-  params.set('dl', window.location.href);
-  params.set('if', 'false');
-  params.set('ts', String(Date.now()));
-
-  if (document.referrer) {
-    params.set('rl', document.referrer);
-  }
-
-  const testCode = getMetaTestCode();
-  if (testCode) {
-    params.set('test_event_code', testCode);
-  }
-
-  const normalizedPayload = payload && typeof payload === 'object' ? payload : null;
-  if (normalizedPayload) {
-    Object.entries(normalizedPayload).forEach(([key, value]) => {
-      if (value === undefined || value === null) {
-        return;
-      }
-
-      const serialized =
-        typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-          ? String(value)
-          : JSON.stringify(value);
-
-      params.set(`cd[${key}]`, serialized);
-    });
-  }
-
-  return `${META_PIXEL_REQUEST_URL}?${params.toString()}`;
-}
-
-function sendMetaTestPing(eventName, payload = null) {
-  if (!canUseMetaPixel() || !isMetaTestModeEnabled()) {
-    return false;
-  }
-
-  const url = buildTestPingUrl(eventName, payload);
-  const image = new Image(1, 1);
-
-  image.onload = () => {
-    recordNetworkEvent('request_loaded', { eventName, url });
-    logMetaPixel(`Network request loaded for ${eventName}`, { url });
-  };
-
-  image.onerror = () => {
-    recordNetworkEvent('request_failed', { eventName, url });
-    logMetaPixel(`Network request failed for ${eventName}`, { url });
-  };
-
-  image.src = url;
-  window.__metaPixelLastTestPing = image;
-
-  recordNetworkEvent('request_started', { eventName, url });
-  logMetaPixel(`Network request started for ${eventName}`, { url });
-  return true;
-}
-
 function sendMetaPixelEvent(method, eventName, payload = undefined) {
   if (!canUseMetaPixel()) {
     return false;
@@ -438,8 +350,6 @@ function sendMetaPixelEvent(method, eventName, payload = undefined) {
     pixelId: PIXEL_ID,
   });
   logMetaPixel(`${eventName} fbq called`, normalizedPayload || null);
-
-  sendMetaTestPing(eventName, normalizedPayload || null);
   return true;
 }
 
@@ -560,34 +470,96 @@ function buildEventPayload(items, basePayload = {}) {
 }
 
 function getTrackedPurchaseIds() {
-  if (!canUseMetaPixel() || typeof window.sessionStorage === 'undefined') {
+  if (!canUseMetaPixel()) {
+    return [];
+  }
+
+  const purchaseIds = new Set();
+  getPurchaseRegistry(PURCHASE_RUNTIME_TRACKED_KEY).forEach((entry) => {
+    if (entry) {
+      purchaseIds.add(entry);
+    }
+  });
+
+  readTrackedPurchaseIdsFromStorage(window.sessionStorage).forEach((entry) => purchaseIds.add(entry));
+  readTrackedPurchaseIdsFromStorage(window.localStorage).forEach((entry) => purchaseIds.add(entry));
+
+  return Array.from(purchaseIds).slice(0, MAX_STORED_PURCHASE_IDS);
+}
+
+function getPurchaseRegistry(key) {
+  if (!canUseMetaPixel()) {
+    return new Set();
+  }
+
+  const registry = window[key];
+  if (registry instanceof Set) {
+    return registry;
+  }
+
+  const nextRegistry = new Set(Array.isArray(registry) ? registry : []);
+  window[key] = nextRegistry;
+  return nextRegistry;
+}
+
+function readTrackedPurchaseIdsFromStorage(storage) {
+  if (!storage) {
     return [];
   }
 
   try {
-    const raw = window.sessionStorage.getItem(PURCHASE_STORAGE_KEY);
+    const raw = storage.getItem(PURCHASE_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.map((entry) => normalizeString(entry)).filter(Boolean)
+      : [];
   } catch {
     return [];
   }
 }
 
-function markPurchaseTracked(orderId) {
-  if (!orderId || !canUseMetaPixel() || typeof window.sessionStorage === 'undefined') {
+function writeTrackedPurchaseIdsToStorage(storage, orderId) {
+  if (!storage || !orderId) {
     return;
   }
 
   const nextIds = [
     orderId,
-    ...getTrackedPurchaseIds().filter((entry) => entry !== orderId),
+    ...readTrackedPurchaseIdsFromStorage(storage).filter((entry) => entry !== orderId),
   ].slice(0, MAX_STORED_PURCHASE_IDS);
 
   try {
-    window.sessionStorage.setItem(PURCHASE_STORAGE_KEY, JSON.stringify(nextIds));
+    storage.setItem(PURCHASE_STORAGE_KEY, JSON.stringify(nextIds));
   } catch {
     // Ignore storage failures and still allow event delivery.
   }
+}
+
+function markPurchasePending(orderId) {
+  if (!orderId || !canUseMetaPixel()) {
+    return;
+  }
+
+  getPurchaseRegistry(PURCHASE_RUNTIME_PENDING_KEY).add(orderId);
+}
+
+function clearPendingPurchase(orderId) {
+  if (!orderId || !canUseMetaPixel()) {
+    return;
+  }
+
+  getPurchaseRegistry(PURCHASE_RUNTIME_PENDING_KEY).delete(orderId);
+}
+
+function markPurchaseTracked(orderId) {
+  if (!orderId || !canUseMetaPixel()) {
+    return;
+  }
+
+  clearPendingPurchase(orderId);
+  getPurchaseRegistry(PURCHASE_RUNTIME_TRACKED_KEY).add(orderId);
+  writeTrackedPurchaseIdsToStorage(window.sessionStorage, orderId);
+  writeTrackedPurchaseIdsToStorage(window.localStorage, orderId);
 }
 
 function hasTrackedPurchase(orderId) {
@@ -595,7 +567,10 @@ function hasTrackedPurchase(orderId) {
     return false;
   }
 
-  return getTrackedPurchaseIds().includes(orderId);
+  return (
+    getPurchaseRegistry(PURCHASE_RUNTIME_PENDING_KEY).has(orderId) ||
+    getTrackedPurchaseIds().includes(orderId)
+  );
 }
 
 function getNameParts(fullName) {
@@ -743,16 +718,27 @@ export function trackMetaPurchase({
   const payload = buildEventPayload(items, {
     value: Number.isFinite(numericValue) ? numericValue : 0,
     currency: normalizeString(currency) || 'INR',
-    custom_data: normalizedOrderId ? { order_id: normalizedOrderId } : {},
+    custom_data: normalizedOrderId
+      ? {
+          order_id: normalizedOrderId,
+          transaction_id: normalizedOrderId,
+        }
+      : {},
   });
 
   if (!payload) {
     return false;
   }
 
+  if (normalizedOrderId) {
+    markPurchasePending(normalizedOrderId);
+  }
+
   const sent = sendMetaPixelEvent('track', 'Purchase', payload);
   if (sent && normalizedOrderId && canUseMetaPixel()) {
     markPurchaseTracked(normalizedOrderId);
+  } else if (normalizedOrderId) {
+    clearPendingPurchase(normalizedOrderId);
   }
   return sent;
 }
