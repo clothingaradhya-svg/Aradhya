@@ -658,9 +658,14 @@ export async function applyMetaAdvancedMatching(input = {}) {
 
   advancedMatchingSignature = signature;
   lastAdvancedMatchingSignature = signature;
+  window.__aradhyaMetaPixelAdvancedMatchingData = userData;
 
   recordDebugEvent('advanced_matching_prepared', { pixelId: PIXEL_ID, userData });
   logMetaPixel('Advanced matching prepared', userData);
+
+  fbq('init', PIXEL_ID, userData);
+  recordDebugEvent('advanced_matching_applied', { pixelId: PIXEL_ID, userData });
+  logMetaPixel('Advanced matching applied', userData);
   return true;
 }
 

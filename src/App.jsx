@@ -47,8 +47,8 @@ export default function App() {
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <AnalyticsTracker />
         <MetaAdvancedMatchingTracker />
+        <AnalyticsTracker />
         <ScrollToTop />
         <Routes>
           <Route
