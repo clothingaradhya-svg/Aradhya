@@ -136,6 +136,7 @@ const ProductCard = ({ item, enableImageScroller = false }) => {
               <img
                 src={imageUrl}
                 alt={imageAlt}
+                title={imageAlt}
                 className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 loading="lazy"
                 decoding="async"

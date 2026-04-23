@@ -17,6 +17,7 @@ const upsertPreloadLink = (href) => {
 export default function OptimizedImage({
   src,
   alt,
+  title,
   sources = [],
   priority = false,
   className = '',
@@ -32,6 +33,13 @@ export default function OptimizedImage({
     }
   }, [priority, src]);
 
+  const imageTitle =
+    typeof title === 'string' && title.trim()
+      ? title.trim()
+      : typeof alt === 'string' && alt.trim()
+        ? alt.trim()
+        : undefined;
+
   return (
     <picture className={pictureClassName}>
       {sources.map((source) => (
@@ -46,6 +54,7 @@ export default function OptimizedImage({
       <img
         src={src}
         alt={alt}
+        title={imageTitle}
         className={className}
         sizes={sizes}
         width={width}

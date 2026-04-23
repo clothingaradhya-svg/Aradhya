@@ -36,6 +36,7 @@ const Navbar = ({ onSearchClick, onCartClick }) => {
             <img
               src="/aradhya-logo.png"
               alt="Aradhya"
+              title="Aradhya"
               className="h-12 w-auto object-contain md:h-14"
             />
           </Link>
