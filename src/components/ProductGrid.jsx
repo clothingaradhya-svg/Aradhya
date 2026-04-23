@@ -5,10 +5,12 @@ import ProductCard from './ProductCard';
 
 const SectionHeader = ({ title, ctaHref, ctaLabel }) => (
   <div className="flex flex-col gap-4 border-t border-neutral-200 py-4 uppercase md:flex-row md:items-center md:justify-between">
-    <h2 className="text-xs tracking-[0.35em] text-neutral-600">{title}</h2>
+    <h2 className="max-w-[18rem] text-[10px] leading-5 tracking-[0.24em] text-neutral-600 sm:max-w-none sm:text-xs sm:tracking-[0.35em]">
+      {title}
+    </h2>
     <Link
       to={ctaHref}
-      className="flex items-center gap-2 self-start rounded-full border border-neutral-900 px-5 py-2 text-[10px] tracking-[0.32em] transition hover:bg-neutral-900 hover:text-white sm:self-end md:self-auto"
+      className="flex items-center gap-2 self-start rounded-full border border-neutral-900 px-4 py-2 text-[10px] tracking-[0.18em] transition hover:bg-neutral-900 hover:text-white sm:self-end sm:px-5 sm:tracking-[0.32em] md:self-auto"
     >
       {ctaLabel}
       <ChevronRight className="h-3 w-3" />
@@ -62,7 +64,7 @@ export default function ProductGrid({
       <div className="flex justify-center py-5">
         <Link
           to={ctaHref}
-          className="rounded-full border border-neutral-900 px-8 py-3 text-[11px] uppercase tracking-[0.3em] transition hover:bg-neutral-900 hover:text-white"
+          className="rounded-full border border-neutral-900 px-6 py-3 text-[10px] uppercase tracking-[0.18em] transition hover:bg-neutral-900 hover:text-white sm:px-8 sm:text-[11px] sm:tracking-[0.3em]"
         >
           {ctaLabel}
         </Link>

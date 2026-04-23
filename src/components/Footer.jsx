@@ -19,9 +19,9 @@ const Footer = () => {
   return (
     <footer className="relative bg-[var(--color-bg-dark)] pb-20 pt-12 font-sans text-slate-100 md:pb-6 md:pt-14">
       <div className="site-shell">
-        <div className="mb-12 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:mb-12 lg:grid-cols-3 lg:gap-10">
           <div>
-            <h3 className="mb-5 text-lg font-bold">Quick Links</h3>
+            <h3 className="mb-4 text-3xl font-semibold tracking-tight">Quick Links</h3>
             <ul className="flex flex-col gap-3 text-sm text-slate-300">
               <li><Link to="/" className="transition-colors hover:text-white">Home</Link></li>
               <li><Link to="/contact" className="transition-colors hover:text-white">Contact Us</Link></li>
@@ -32,7 +32,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="mb-5 text-lg font-bold">Policies</h3>
+            <h3 className="mb-4 text-3xl font-semibold tracking-tight">Policies</h3>
             <ul className="flex flex-col gap-3 text-sm text-slate-300">
               <li><Link to="/legal/privacy-policy" className="transition-colors hover:text-white">Privacy Policy</Link></li>
               <li><Link to="/legal/money-back-policy" className="transition-colors hover:text-white">Refund Policy</Link></li>
@@ -42,7 +42,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="mb-5 text-lg font-bold">Follow Us</h3>
+            <h3 className="mb-4 text-3xl font-semibold tracking-tight">Follow Us</h3>
             <div className="flex gap-4">
               <a
                 href="#"
@@ -70,19 +70,19 @@ const Footer = () => {
         </div>
 
         <div className="grid gap-4 border-t border-white/15 pt-6 text-xs text-slate-300 md:grid-cols-2 md:text-sm lg:grid-cols-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
             <Truck className="h-4 w-4 text-[var(--color-primary)]" />
             <span>Fast, Free Shipping Across India</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
             <CreditCard className="h-4 w-4 text-[var(--color-primary)]" />
             <span>COD Available With No Extra Fee</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
             <RotateCcw className="h-4 w-4 text-[var(--color-primary)]" />
             <span>7-Day Easy Returns On Eligible Orders</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
             <Headphones className="h-4 w-4 text-[var(--color-primary)]" />
             <span>Customer Support Available Daily</span>
           </div>

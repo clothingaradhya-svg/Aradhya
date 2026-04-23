@@ -47,7 +47,7 @@ const Navbar = ({ onSearchClick, onCartClick }) => {
             <Link
               key={link.label}
               to={link.href}
-              className="relative whitespace-nowrap py-8 text-[13px] font-bold tracking-widest text-gray-800 transition-colors hover:text-black"
+              className="relative whitespace-nowrap py-8 text-[12px] font-semibold tracking-[0.24em] text-gray-800 transition-colors hover:text-black xl:text-[13px] xl:tracking-[0.3em]"
             >
               {link.label}
               {link.isNew && (
@@ -139,7 +139,7 @@ const Navbar = ({ onSearchClick, onCartClick }) => {
               <Link
                 key={link.label}
                 to={link.href}
-                className="rounded-md border border-transparent px-2 py-2 text-sm font-bold text-[var(--color-text-main)] hover:border-[var(--color-border)] hover:bg-[var(--color-bg-surface-muted)]"
+                className="rounded-md border border-transparent px-2 py-2 text-sm font-semibold tracking-[0.08em] text-[var(--color-text-main)] hover:border-[var(--color-border)] hover:bg-[var(--color-bg-surface-muted)]"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {link.label}

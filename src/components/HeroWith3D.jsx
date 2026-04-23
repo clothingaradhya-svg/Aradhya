@@ -115,14 +115,14 @@ export default function HeroWith3D({
       <div className="relative z-40 flex flex-1 items-end px-4 pb-10 pt-28 sm:px-6 sm:pb-12 md:px-8 md:pb-16 lg:px-12">
         <div className="mx-auto w-full max-w-6xl">
           <div className="max-w-3xl space-y-4 text-white sm:space-y-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-white/80">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-white/80 sm:text-[11px] sm:tracking-[0.38em]">
               {eyebrow}
             </p>
-            <h1 className="max-w-2xl text-4xl font-semibold leading-tight tracking-tight text-white sm:text-5xl md:text-6xl">
+            <h1 className="max-w-2xl text-[clamp(3.1rem,10vw,5.7rem)] font-semibold leading-[0.95] tracking-tight text-white">
               {title}
             </h1>
             {description ? (
-              <p className="max-w-xl text-sm leading-7 text-white/80 md:text-base">
+              <p className="max-w-xl text-sm leading-6 text-white/80 sm:text-[15px] sm:leading-7 md:text-base">
                 {description}
               </p>
             ) : null}
@@ -130,7 +130,7 @@ export default function HeroWith3D({
               <button
                 type="button"
                 onClick={onCtaClick}
-                className="rounded-full border border-white/95 px-6 py-3 text-[10px] uppercase tracking-[0.35em] text-white/90 transition hover:bg-white hover:text-neutral-900 sm:px-8 sm:text-[11px]"
+                className="rounded-full border border-white/95 px-5 py-3 text-[10px] uppercase tracking-[0.22em] text-white/90 transition hover:bg-white hover:text-neutral-900 sm:px-8 sm:text-[11px] sm:tracking-[0.35em]"
               >
                 {ctaLabel}
               </button>

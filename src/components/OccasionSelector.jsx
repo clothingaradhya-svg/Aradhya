@@ -35,8 +35,8 @@ export default function OccasionSelector({ selectedSkintone }) {
     // or show default links. The user wants it to show ONLY when skintone is chosen.
 
     return (
-        <section className="site-shell py-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <h2 className="text-2xl md:text-3xl font-bold text-[#001f3f] mb-8">
+        <section className="site-shell py-8 sm:py-10 md:py-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h2 className="mb-6 text-[clamp(2rem,6vw,3.2rem)] font-semibold text-[#001f3f] md:mb-8">
                 Select your occasion
             </h2>
 
