@@ -264,15 +264,15 @@ export default function HomePage() {
         />
       </div>
 
-      <section className="site-shell py-8 md:py-12">
-        <div className="mx-auto max-w-4xl space-y-4 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-gray-500">
+      <section className="site-shell py-6 sm:py-8 md:py-12">
+        <div className="mx-auto max-w-4xl space-y-3 px-1 text-center sm:space-y-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-gray-500 sm:text-xs sm:tracking-[0.35em]">
             Curated combinations
           </p>
-          <h2 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+          <h2 className="mx-auto max-w-3xl text-[clamp(2rem,7vw,4rem)] font-semibold leading-[1.02] tracking-tight text-slate-950">
             Premium combinations by skin tone, occasion, and budget
           </h2>
-          <p className="text-sm leading-7 text-gray-600 md:text-base">
+          <p className="mx-auto max-w-3xl text-sm leading-6 text-gray-600 sm:text-base sm:leading-7">
             Explore Aradhya designer wear for elevated outfit combinations, from skintone-based
             coordination to old money styling and premium men&apos;s looks under 2500.
           </p>
@@ -316,8 +316,8 @@ export default function HomePage() {
       </div>
 
       <section className="site-shell cv-auto pb-16 pt-4 md:pb-20">
-        <div className="mb-8 flex items-end justify-between gap-4">
-          <div>
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-2xl">
             <h2 className="text-2xl font-semibold text-slate-950 md:text-3xl">
               Men&apos;s Fashion Guides for India
             </h2>
@@ -326,7 +326,7 @@ export default function HomePage() {
               and skintone-based outfit ideas tailored to Indian menswear.
             </p>
           </div>
-          <Link to="/blog" className="text-sm font-semibold text-slate-900 underline underline-offset-4">
+          <Link to="/blog" className="self-start text-sm font-semibold text-slate-900 underline underline-offset-4 md:self-auto">
             View all articles
           </Link>
         </div>

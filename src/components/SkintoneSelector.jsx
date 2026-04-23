@@ -24,25 +24,25 @@ const skintones = [
 
 export default function SkintoneSelector({ onSelect }) {
   return (
-    <section className="py-10 bg-white">
-      <div className="max-w-7xl mx-auto px-4 space-y-6">
-        <h2 className="text-center text-2xl md:text-4xl font-semibold tracking-[0.15em] uppercase text-slate-900">
+    <section className="bg-white py-6 sm:py-8 md:py-10">
+      <div className="mx-auto max-w-7xl px-3 space-y-5 sm:px-4 sm:space-y-6">
+        <h2 className="mx-auto max-w-5xl text-center text-[clamp(1.85rem,6.2vw,3.5rem)] font-semibold uppercase leading-[1.08] tracking-[0.08em] text-slate-900 sm:tracking-[0.12em]">
           Select Your Skintone & Get Perfect Combination
         </h2>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
           {skintones.map((tone) => (
             <button
               key={tone.id}
               type="button"
               onClick={() => onSelect?.(tone.id)}
-              className="block w-full"
+              className="block w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 shadow-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-md"
             >
               <OptimizedImage
                 src={tone.image}
                 sources={[{ srcSet: tone.webp, type: 'image/webp' }]}
                 alt={`${tone.label} outfit combinations for men`}
-                className="block w-full h-auto"
+                className="block h-auto w-full"
                 width={768}
                 height={960}
               />
