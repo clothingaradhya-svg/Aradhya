@@ -294,40 +294,6 @@ const ProductDetails = () => {
     () => buildAggregateRatingSchema(reviewSummary),
     [reviewSummary],
   );
-  const productStructuredData = useMemo(
-    () =>
-      buildProductSchema({
-        name: product?.title,
-        description: productSeoDescription,
-        image: images.map((image) => image?.url).filter(Boolean),
-        sku: String(selectedVariant?.sku || selectedVariant?.id || product?.id || product?.handle || ''),
-        url: productPageUrl,
-        price: Number(selectedVariant?.price ?? product?.price ?? 0),
-        currency: selectedVariant?.currencyCode || product?.currencyCode || 'INR',
-        availability: selectedVariant?.availableForSale === false
-          ? 'https://schema.org/OutOfStock'
-          : 'https://schema.org/InStock',
-        aggregateRating: aggregateRatingSchema,
-        reviews: reviewItems,
-      }),
-    [
-      aggregateRatingSchema,
-      images,
-      product?.currencyCode,
-      product?.handle,
-      product?.id,
-      product?.price,
-      product?.title,
-      productPageUrl,
-      productSeoDescription,
-      reviewItems,
-      selectedVariant?.availableForSale,
-      selectedVariant?.currencyCode,
-      selectedVariant?.id,
-      selectedVariant?.price,
-      selectedVariant?.sku,
-    ],
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -663,6 +629,41 @@ const ProductDetails = () => {
 
     return matchByBoth || findVariantForSize(product, selectedSize);
   }, [product, selectedSize, selectedColor]);
+  const productStructuredData = useMemo(
+    () =>
+      buildProductSchema({
+        name: product?.title,
+        description: productSeoDescription,
+        image: images.map((image) => image?.url).filter(Boolean),
+        sku: String(selectedVariant?.sku || selectedVariant?.id || product?.id || product?.handle || ''),
+        url: productPageUrl,
+        price: Number(selectedVariant?.price ?? product?.price ?? 0),
+        currency: selectedVariant?.currencyCode || product?.currencyCode || 'INR',
+        availability:
+          selectedVariant?.availableForSale === false
+            ? 'https://schema.org/OutOfStock'
+            : 'https://schema.org/InStock',
+        aggregateRating: aggregateRatingSchema,
+        reviews: reviewItems,
+      }),
+    [
+      aggregateRatingSchema,
+      images,
+      product?.currencyCode,
+      product?.handle,
+      product?.id,
+      product?.price,
+      product?.title,
+      productPageUrl,
+      productSeoDescription,
+      reviewItems,
+      selectedVariant?.availableForSale,
+      selectedVariant?.currencyCode,
+      selectedVariant?.id,
+      selectedVariant?.price,
+      selectedVariant?.sku,
+    ],
+  );
 
   const getVariantForOptions = useMemo(() => {
     return (item, { size, color }) => {

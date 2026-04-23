@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0a0a0a" />
     <link rel="canonical" href="https://www.thehouseofaradhya.com/" />
-    <link rel="preload" as="image" href="/images/hero-poster.webp" fetchpriority="high" />
     <meta
       name="description"
       content="The House of Aradhya is a premium Indian ecommerce brand with curated collections, product pages, and editorial content."
@@ -39,6 +38,20 @@
       #root { min-height: 100vh; }
       .app-shell { min-height: 100vh; background: #0a0a0a; }
     </style>
+    <script>
+      (function () {
+        var pathname = window.location.pathname || '/';
+        if (pathname !== '/' && pathname !== '') return;
+        var existing = document.head.querySelector('link[rel="preload"][as="image"][href="/images/hero-poster.webp"]');
+        if (existing) return;
+        var link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = '/images/hero-poster.webp';
+        link.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(link);
+      })();
+    </script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
