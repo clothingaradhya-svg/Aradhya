@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { blogArticles } from '../src/content/blogArticles.js';
+import { keywordLandingPages } from '../src/content/keywordLandingPages.js';
 import { DEFAULT_SOCIAL_IMAGE, SITE_URL } from '../src/lib/seo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +37,12 @@ const STATIC_ROUTES = [
   { path: '/legal/refund-return-policy', changefreq: 'monthly', priority: '0.3' },
   { path: '/legal/refund-process', changefreq: 'monthly', priority: '0.3' },
   { path: '/legal/cookie-policy', changefreq: 'monthly', priority: '0.3' },
+  ...keywordLandingPages.map((page) => ({
+    path: page.path,
+    changefreq: 'weekly',
+    priority: page.pageType === 'guide' ? '0.85' : '0.8',
+    image: page.heroImageWebp || page.heroImage,
+  })),
 ];
 
 const toAbsoluteUrl = (pathname) => new URL(pathname, SITE_URL).toString();

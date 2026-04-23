@@ -13,8 +13,8 @@ import { fetchHomepageProducts, toProductCard } from '../lib/api';
 import {
   buildBreadcrumbSchema,
   buildOrganizationSchema,
+  buildWebPageSchema,
   buildWebsiteSchema,
-  TARGET_KEYWORDS,
 } from '../lib/seo';
 import heroVideo from '../assets/Coin_in_Nature_Climate_Video.mp4';
 
@@ -22,6 +22,28 @@ const PRIMARY_HANDLE = import.meta.env.VITE_HOME_PRIMARY_COLLECTION ?? null;
 const SECONDARY_HANDLE = import.meta.env.VITE_HOME_SECONDARY_COLLECTION ?? null;
 const HERO_POSTER = '/images/hero-poster.jpg';
 const HERO_POSTER_WEBP = '/images/hero-poster.webp';
+const homepageGuideLinks = [
+  {
+    href: '/men-outfit-combination',
+    label: 'Everyday outfit ideas',
+    description: 'Build cleaner daily looks with sharper layering and calmer palettes.',
+  },
+  {
+    href: '/men-outfit-under-2500',
+    label: 'Budget-friendly dressing',
+    description: 'See how to create premium-looking wardrobes with smarter buying.',
+  },
+  {
+    href: '/men-fashion-dark-skin',
+    label: 'Skin-tone style guides',
+    description: 'Explore dedicated pages for dark, fair, wheatish, and neutral complexions.',
+  },
+  {
+    href: '/blog',
+    label: 'Read the journal',
+    description: 'Move from brand discovery into focused guides and product-led editorials.',
+  },
+];
 
 export default function HomePage() {
   const { products: catalogProducts, ensureCollectionProducts } = useCatalog();
@@ -208,34 +230,28 @@ export default function HomePage() {
     <div className="home-page">
       <SeoHead
         title="Aradhya Designer Wear for Men in India"
-        description="Shop Aradhya designer wear with men outfit combination ideas, skintone based outfit combinations for men, old money styling, and premium men outfit under 2500 inspiration."
-        keywords={[
-          TARGET_KEYWORDS[0],
-          TARGET_KEYWORDS[1],
-          TARGET_KEYWORDS[2],
-          TARGET_KEYWORDS[3],
-          TARGET_KEYWORDS[13],
-        ]}
+        description="Aradhya designer wear delivers premium menswear, refined styling direction, and polished products designed for modern Indian dressing."
+        keywords={['Aradhya designer wear']}
         canonicalPath="/"
         imageAlt="The House of Aradhya home page"
         preloadImages={[HERO_POSTER_WEBP]}
         structuredData={[
           buildOrganizationSchema({
             description:
-              'Aradhya designer wear for men in India with outfit combinations by skin tone, occasion, and budget.',
+              'Aradhya designer wear for men in India with refined products and modern styling direction.',
           }),
           buildWebsiteSchema({
             description:
-              'Aradhya designer wear for men in India with outfit combinations by skin tone, occasion, and budget.',
+              'Aradhya designer wear for men in India with refined products and modern styling direction.',
           }),
-          {
-            '@context': 'https://schema.org',
-            '@type': 'WebPage',
+          buildWebPageSchema({
             name: 'Aradhya designer wear for men',
             description:
-              'Aradhya designer wear for men in India with outfit combinations by skin tone, occasion, and budget.',
+              'Aradhya designer wear for men in India with refined products and modern styling direction.',
             url: 'https://www.thehouseofaradhya.com/',
-          },
+            image: HERO_POSTER,
+            about: 'Aradhya designer wear',
+          }),
           buildBreadcrumbSchema([
             {
               name: 'Home',
@@ -258,7 +274,7 @@ export default function HomePage() {
           ]}
           eyebrow="Men's Designer Wear"
           title="Aradhya Designer Wear for Men in India"
-          description="Premium men outfit combinations, skintone-based styling, and occasion-ready looks designed to feel sharp from the first click."
+          description="Premium menswear, modern Indian styling, and elevated essentials designed to make everyday dressing feel more confident."
           ctaLabel="Select Skintone"
           onCtaClick={handleSkintoneScroll}
         />
@@ -270,11 +286,11 @@ export default function HomePage() {
             Curated combinations
           </p>
           <h2 className="mx-auto max-w-3xl text-[clamp(2rem,7vw,4rem)] font-semibold leading-[1.02] tracking-tight text-slate-950">
-            Premium combinations by skin tone, occasion, and budget
+            Premium dressing direction built around product, fit, and feel
           </h2>
           <p className="mx-auto max-w-3xl text-sm leading-6 text-gray-600 sm:text-base sm:leading-7">
-            Explore Aradhya designer wear for elevated outfit combinations, from skintone-based
-            coordination to old money styling and premium men&apos;s looks under 2500.
+            Explore Aradhya designer wear through curated edits, skin-tone guidance, and
+            editorial pathways that help every product feel easier to wear in real life.
           </p>
         </div>
       </section>
@@ -315,15 +331,145 @@ export default function HomePage() {
         />
       </div>
 
+      <section className="site-shell cv-auto py-14 md:py-20">
+        <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+          <article className="rounded-[32px] border border-gray-200 bg-white px-6 py-8 shadow-sm md:px-10 md:py-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-gray-500">
+              Why Aradhya
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold text-slate-950 md:text-4xl">
+              Aradhya designer wear is built for modern Indian dressing
+            </h2>
+
+            <div className="mt-6 space-y-8">
+              <section className="space-y-4">
+                <h3 className="text-2xl font-semibold text-slate-950">
+                  Design that feels polished in daily life
+                </h3>
+                <p className="text-base leading-7 text-gray-700">
+                  Aradhya designer wear is strongest when it does not ask you to become a different
+                  person to wear it. The brand works because the products feel elevated while still
+                  staying rooted in real Indian routines. Whether the day includes meetings, travel,
+                  coffee plans, or an evening shift in mood, the clothes are designed to hold their
+                  shape and help the wearer look sharper without feeling stiff. That balance between
+                  confidence and comfort is what makes premium dressing sustainable instead of
+                  occasional.
+                </p>
+                <p className="text-base leading-7 text-gray-700">
+                  Good menswear should not create friction. It should reduce it. When the fit is
+                  clean, the fabric feels considered, and the product already carries a sense of
+                  direction, getting dressed becomes less about guesswork and more about selection.
+                  That is where Aradhya designer wear creates value. It gives men a wardrobe base
+                  that feels more intentional from the start, which makes styling faster and every
+                  future purchase easier to justify.
+                </p>
+              </section>
+
+              <section className="space-y-4">
+                <h3 className="text-2xl font-semibold text-slate-950">
+                  A brand identity shaped by refinement, not excess
+                </h3>
+                <p className="text-base leading-7 text-gray-700">
+                  The appeal of Aradhya designer wear comes from refinement rather than noise. The
+                  products are not trying to overpower the wearer. Instead, they help create a more
+                  composed visual identity through silhouette, texture, and cleaner styling. That
+                  restraint matters because premium clothing looks most convincing when the quality
+                  is felt in the result rather than announced too loudly through the design itself.
+                </p>
+                <p className="text-base leading-7 text-gray-700">
+                  This brand-led clarity also allows the storefront to support many types of
+                  customers at once. Some visitors want wardrobe essentials with better polish.
+                  Others want direction for occasion dressing, smarter layering, or more elevated
+                  gifting. Aradhya designer wear can serve all of those needs because the design
+                  language is consistent enough to feel premium while remaining flexible enough to
+                  enter different lifestyles naturally.
+                </p>
+              </section>
+
+              <section className="space-y-4">
+                <h3 className="text-2xl font-semibold text-slate-950">
+                  Better products become easier to style
+                </h3>
+                <p className="text-base leading-7 text-gray-700">
+                  A good product page matters, but premium ecommerce goes further when the customer
+                  also understands how the brand should live inside a wardrobe. That is why Aradhya
+                  designer wear benefits from editorial direction around skin tone, occasion, and
+                  wardrobe logic. The products already offer visual quality. The added guidance
+                  helps shoppers convert that quality into personal style more quickly and with more
+                  confidence.
+                </p>
+                <p className="text-base leading-7 text-gray-700">
+                  This approach is especially useful in India, where dressing often needs to move
+                  between climate shifts, social settings, and practical daily movement. A brand
+                  that offers both refined product and usable direction becomes more memorable than
+                  one that only presents catalog images. Aradhya designer wear gains strength by
+                  making its products easier to imagine in real life, not just easier to admire in
+                  isolation.
+                </p>
+              </section>
+
+              <section className="space-y-4">
+                <h3 className="text-2xl font-semibold text-slate-950">
+                  A stronger path from discovery to purchase
+                </h3>
+                <p className="text-base leading-7 text-gray-700">
+                  The best brand pages do more than describe a label. They create momentum. Aradhya
+                  designer wear has the strongest conversion potential when visitors can move from
+                  the homepage into curated pages that answer specific wardrobe questions. That is
+                  why this site now links brand discovery to deeper editorial routes, focused
+                  product edits, and practical shopping pathways. The experience stays elegant, but
+                  it also becomes more useful.
+                </p>
+                <p className="text-base leading-7 text-gray-700">
+                  Over time, that kind of structure does more than help search visibility. It also
+                  makes the brand feel coherent. Every page reinforces a different reason to trust
+                  the label, while the homepage continues to anchor the identity of Aradhya
+                  designer wear itself. That is the foundation of a brand-led SEO system that can
+                  grow without losing clarity.
+                </p>
+              </section>
+            </div>
+          </article>
+
+          <aside className="space-y-5">
+            <div className="rounded-[32px] border border-gray-200 bg-slate-950 p-6 text-white shadow-sm md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.32em] text-white/60">
+                Explore the Site
+              </p>
+              <h2 className="mt-4 text-3xl font-semibold">
+                Follow the path that fits your wardrobe question
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/75">
+                These internal links move visitors from brand discovery into dedicated landing
+                pages and editorial content without forcing them through a generic catalog first.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              {homepageGuideLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className="rounded-[28px] border border-gray-200 bg-white px-5 py-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                >
+                  <h3 className="text-lg font-semibold text-slate-950">{item.label}</h3>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{item.description}</p>
+                </Link>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </section>
+
       <section className="site-shell cv-auto pb-16 pt-4 md:pb-20">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-semibold text-slate-950 md:text-3xl">
-              Men&apos;s Fashion Guides for India
+              Focused Style Guides
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-              Read styling guides on the best colour combination for men, occasion-ready looks,
-              and skintone-based outfit ideas tailored to Indian menswear.
+              Move from the brand page into tightly focused guides that answer one styling question
+              at a time and connect directly to relevant products.
             </p>
           </div>
           <Link to="/blog" className="self-start text-sm font-semibold text-slate-900 underline underline-offset-4 md:self-auto">

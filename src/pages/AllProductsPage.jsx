@@ -10,7 +10,6 @@ import { fetchProductsPage, normaliseTokenValue, toProductCard } from '../lib/ap
 import {
   buildBreadcrumbSchema,
   buildOrganizationSchema,
-  TARGET_KEYWORDS,
 } from '../lib/seo';
 
 const normalizeForMatch = (value) => {
@@ -397,23 +396,23 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
   const routePath = typeof window !== 'undefined' ? window.location.pathname : '/products';
   const canonicalPath = routePath || '/products';
   const seoTitle = displaySkintone && displayOccasion
-    ? `${displaySkintone} ${displayOccasion} Outfit Ideas for Men`
+    ? `${displaySkintone} ${displayOccasion} Menswear Edit`
     : displaySkintone
-      ? `${displaySkintone} Outfit Combinations for Men`
+      ? `${displaySkintone} Menswear Edit`
       : displayOccasion
-        ? `${displayOccasion} Outfit Ideas for Men India`
+        ? `${displayOccasion} Menswear Edit`
         : activeCategory !== 'all'
           ? `${formatLabel(activeCategory)} for Men`
-          : 'Men Outfit Combination and Designer Wear';
+          : 'Designer Menswear Products';
   const seoDescription = displaySkintone && displayOccasion
-    ? `Browse ${displaySkintone.toLowerCase()} ${displayOccasion.toLowerCase()} looks from Aradhya designer wear with curated men outfit combination ideas for India.`
+    ? `Browse ${displaySkintone.toLowerCase()} ${displayOccasion.toLowerCase()} products from Aradhya with refined styling and polished everyday direction.`
     : displaySkintone
-      ? `Discover ${displaySkintone.toLowerCase()} styling with skintone based outfit combinations for men, the best colour combination for men, and easy premium looks from Aradhya.`
+      ? `Discover ${displaySkintone.toLowerCase()} focused products from Aradhya with balanced colour direction and premium everyday styling.`
       : displayOccasion
-        ? `Shop ${displayOccasion.toLowerCase()} looks from Aradhya designer wear with shirt and pant shoes combination for men, party outfit ideas, and India-ready styling.`
+        ? `Shop ${displayOccasion.toLowerCase()} products from Aradhya with polished layering, premium fabrics, and India-ready styling.`
         : activeCategory !== 'all'
-          ? `Shop ${formatLabel(activeCategory).toLowerCase()} from Aradhya designer wear with premium men outfit combination ideas for India.`
-          : `Explore Aradhya designer wear, men outfit under 2500 ideas, and occasion-ready combinations for date, party, college, and old money styling.`;
+          ? `Shop ${formatLabel(activeCategory).toLowerCase()} from Aradhya with refined menswear styling and premium product direction for India.`
+          : 'Explore Aradhya products across categories, skin filters, and occasion-led menswear edits.';
   const seoIntro = displaySkintone && displayOccasion
     ? `${displaySkintone} and ${displayOccasion} filters are active, so these products focus on colour, fit, and combinations that feel polished on Indian men.`
     : displaySkintone
@@ -422,7 +421,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
         ? `These edited looks help you build a confident ${displayOccasion.toLowerCase()} wardrobe with versatile combinations that work in India.`
         : activeCategory !== 'all'
           ? `Explore this category with Aradhya styling ideas designed around fit, colour balance, and premium everyday wear.`
-          : `Browse men outfit combination ideas across budget looks, skintone styling, and occasion-led designer wear for men in India.`;
+          : 'Browse designer menswear products across curated edits, filters, and category-led discovery.';
 
   const updateFilter = (key, value) => {
     const prev = new URLSearchParams(searchParams);
@@ -446,22 +445,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
       <SeoHead
         title={seoTitle}
         description={seoDescription}
-        keywords={[
-          TARGET_KEYWORDS[0],
-          displaySkintone ? TARGET_KEYWORDS[2] : TARGET_KEYWORDS[1],
-          displayOccasion?.toLowerCase().includes('party')
-            ? TARGET_KEYWORDS[11]
-            : displayOccasion?.toLowerCase().includes('date')
-              ? TARGET_KEYWORDS[10]
-              : TARGET_KEYWORDS[4],
-          displaySkintone?.toLowerCase().includes('fair')
-            ? TARGET_KEYWORDS[7]
-            : displaySkintone?.toLowerCase().includes('neutral')
-              ? TARGET_KEYWORDS[9]
-              : displaySkintone?.toLowerCase().includes('dark')
-                ? TARGET_KEYWORDS[6]
-                : TARGET_KEYWORDS[3],
-        ]}
+        keywords={['designer menswear', 'Aradhya products', pageTitle]}
         canonicalPath={canonicalPath}
         imageAlt={`${pageTitle} listing page`}
         noIndex={Boolean(queryString)}

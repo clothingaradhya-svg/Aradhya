@@ -26,6 +26,9 @@ const Footer = () => {
               <li><Link to="/" className="transition-colors hover:text-white">Home</Link></li>
               <li><Link to="/contact" className="transition-colors hover:text-white">Contact Us</Link></li>
               <li><Link to="/products" className="transition-colors hover:text-white">Shop</Link></li>
+              <li><Link to="/men-outfit-combination" className="transition-colors hover:text-white">Style Guide</Link></li>
+              <li><Link to="/men-outfit-under-2500" className="transition-colors hover:text-white">Budget Looks</Link></li>
+              <li><Link to="/blog" className="transition-colors hover:text-white">Journal</Link></li>
               <li><Link to="/contact" className="transition-colors hover:text-white">Our Location</Link></li>
               <li><Link to="/faq" className="transition-colors hover:text-white">Help Center</Link></li>
             </ul>

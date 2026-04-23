@@ -5,28 +5,28 @@ import { blogArticles } from '../content/blogArticles';
 import {
   buildBreadcrumbSchema,
   buildOrganizationSchema,
-  TARGET_KEYWORDS,
+  buildWebPageSchema,
 } from '../lib/seo';
 
 const BlogPage = () => {
   return (
     <div className="min-h-screen bg-[#f8f8f6] pt-24 pb-16">
       <SeoHead
-        title="Men's Fashion Blog"
-        description="Read India-focused men's fashion guides from Aradhya designer wear, including men outfit combinations, skin tone styling, occasion looks, and old money outfits."
-        keywords={TARGET_KEYWORDS}
+        title="Aradhya Style Journal"
+        description="Read focused menswear guides from Aradhya with practical articles on colour, footwear pairing, and timeless dressing."
+        keywords={['Aradhya style journal']}
         canonicalPath="/blog"
         imageAlt="Aradhya blog"
         structuredData={[
           buildOrganizationSchema(),
-          {
-            '@context': 'https://schema.org',
-            '@type': 'Blog',
-            name: 'Aradhya Blog',
+          buildWebPageSchema({
+            name: 'Aradhya Style Journal',
             description:
-              "Men's fashion blog covering skintone based outfit combinations for men, budget outfits, and occasion styling in India.",
+              'Focused menswear guides from Aradhya covering colour direction, product pairing, and timeless style.',
             url: 'https://www.thehouseofaradhya.com/blog',
-          },
+            image: '/images/occasion-office.jpg',
+            about: 'Aradhya menswear editorial',
+          }),
           buildBreadcrumbSchema([
             {
               name: 'Home',
@@ -46,12 +46,11 @@ const BlogPage = () => {
             Aradhya Editorial
           </p>
           <h1 className="mt-4 text-4xl font-bold text-neutral-900 md:text-5xl">
-            Men&apos;s Fashion Guides for India
+            Aradhya Style Journal
           </h1>
           <p className="mt-4 text-base leading-7 text-neutral-600 md:text-lg">
-            Explore outfit ideas from Aradhya designer wear, including skintone based outfit
-            combinations for men, budget looks under 2500, occasion dressing, and old money
-            outfits for men in India.
+            Read tightly focused menswear articles built around one topic at a time, with clear
+            product links, practical styling logic, and India-ready wardrobe direction.
           </p>
         </div>
 

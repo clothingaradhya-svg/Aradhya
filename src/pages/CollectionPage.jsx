@@ -9,7 +9,6 @@ import { normaliseTokenValue, toProductCard, fetchCollectionByHandle } from '../
 import {
     buildBreadcrumbSchema,
     buildOrganizationSchema,
-    TARGET_KEYWORDS,
 } from '../lib/seo';
 
 const normalizeForMatch = (value) => {
@@ -185,23 +184,18 @@ const CollectionPage = () => {
         ? `${collectionTitle} for ${displaySkintone} Men`
         : `${collectionTitle} Designer Wear for Men`;
     const seoDescription = displaySkintone
-        ? `Shop ${collectionTitle.toLowerCase()} from Aradhya designer wear with ${displaySkintone.toLowerCase()} outfit combinations for men, balanced colour pairings, and premium styling for India.`
-        : `Explore ${collectionTitle.toLowerCase()} from Aradhya designer wear with men outfit combination ideas, premium styling, and occasion-ready looks for India.`;
+        ? `Shop ${collectionTitle.toLowerCase()} from Aradhya with ${displaySkintone.toLowerCase()} focused styling and polished product direction for India.`
+        : `Explore ${collectionTitle.toLowerCase()} from Aradhya with refined menswear styling and premium product direction for India.`;
     const collectionIntro = displaySkintone
         ? `This collection is filtered for ${displaySkintone.toLowerCase()} styling so you can browse combinations that feel sharper, more balanced, and easier to wear.`
-        : `This collection brings together polished pieces designed for premium everyday dressing, refined party looks, and elevated men outfit combinations in India.`;
+        : `This collection brings together polished pieces designed for premium everyday dressing and refined Indian menswear.`;
 
     return (
         <div className="bg-white min-h-screen">
             <SeoHead
                 title={seoTitle}
                 description={seoDescription}
-                keywords={[
-                    TARGET_KEYWORDS[0],
-                    TARGET_KEYWORDS[1],
-                    displaySkintone ? TARGET_KEYWORDS[2] : TARGET_KEYWORDS[4],
-                    TARGET_KEYWORDS[13],
-                ]}
+                keywords={['designer menswear collection', collectionTitle, 'Aradhya products']}
                 canonicalPath={canonicalPath}
                 image={collectionInfo?.image?.url}
                 imageAlt={`${collectionTitle} collection`}

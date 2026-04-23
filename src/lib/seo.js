@@ -116,6 +116,37 @@ export function buildWebsiteSchema({
   };
 }
 
+export function buildWebPageSchema({
+  name,
+  description,
+  url,
+  image,
+  about,
+  isPartOf,
+} = {}) {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name,
+    description,
+    url,
+  };
+
+  if (image) {
+    schema.primaryImageOfPage = normalizeImageUrl(image, DEFAULT_SOCIAL_IMAGE);
+  }
+
+  if (about) {
+    schema.about = about;
+  }
+
+  if (isPartOf) {
+    schema.isPartOf = isPartOf;
+  }
+
+  return schema;
+}
+
 export function buildBreadcrumbSchema(items = []) {
   const normalizedItems = items.filter((item) => item?.name && item?.url);
   if (!normalizedItems.length) return null;
@@ -129,6 +160,27 @@ export function buildBreadcrumbSchema(items = []) {
       name: item.name,
       item: item.url,
     })),
+  };
+}
+
+export function buildFaqSchema(items = []) {
+  const entities = items
+    .filter((item) => item?.question && item?.answer)
+    .map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: stripHtml(item.answer),
+      },
+    }));
+
+  if (!entities.length) return null;
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: entities,
   };
 }
 

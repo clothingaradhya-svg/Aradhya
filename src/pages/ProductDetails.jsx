@@ -44,7 +44,6 @@ import {
   buildProductSchema,
   SITE_URL,
   stripHtml,
-  TARGET_KEYWORDS,
   truncateText,
 } from '../lib/seo';
 
@@ -282,12 +281,12 @@ const ProductDetails = () => {
     : 'Designer Wear for Men';
   const productSeoDescription = product?.title
     ? truncateText(
-      `${product.title} by Aradhya designer wear for men. ${productDescriptionText || 'Discover premium fits, best colour combinations for men, and occasion-ready styling for India.'}`,
+      `${product.title} by Aradhya designer wear for men. ${productDescriptionText || 'Discover premium fits, refined fabrics, and polished styling for India.'}`,
       160,
     )
-    : 'Aradhya designer wear for men in India with premium outfit combinations.';
+    : 'Aradhya designer wear for men in India with refined product styling.';
   const stylingNote = product?.title
-    ? `${product.title} is designed for premium men outfit combination styling, whether you are building a party outfit for men in India, a polished date look, or a refined old money wardrobe.`
+    ? `${product.title} is designed for premium menswear styling with clean structure, refined fabric direction, and versatile Indian dressing in mind.`
     : '';
   const productPageUrl = `${SITE_URL}/product/${product?.handle || slug}`;
   const aggregateRatingSchema = useMemo(
@@ -1266,13 +1265,7 @@ const ProductDetails = () => {
       <SeoHead
         title={productSeoTitle}
         description={productSeoDescription}
-        keywords={[
-          TARGET_KEYWORDS[0],
-          TARGET_KEYWORDS[1],
-          TARGET_KEYWORDS[4],
-          TARGET_KEYWORDS[11],
-          TARGET_KEYWORDS[13],
-        ]}
+        keywords={['Aradhya product', product?.title, product?.vendor || 'Aradhya'].filter(Boolean)}
         canonicalPath={`/product/${product.handle || slug}`}
         type="product"
         image={productSeoImage}

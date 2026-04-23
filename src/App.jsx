@@ -23,6 +23,7 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BlogArticlePage = lazy(() => import('./pages/BlogArticlePage'));
+const KeywordLandingPage = lazy(() => import('./pages/KeywordLandingPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -110,6 +111,15 @@ export default function App() {
               <Route path="contact" element={<ContactPage />} />
               <Route path="blog" element={<BlogPage />} />
               <Route path="blog/:slug" element={<BlogArticlePage />} />
+              <Route path="men-outfit-combination" element={<KeywordLandingPage pageKey="men-outfit-combination" />} />
+              <Route path="men-outfit-under-2500" element={<KeywordLandingPage pageKey="men-outfit-under-2500" />} />
+              <Route path="date-outfit-men-india" element={<KeywordLandingPage pageKey="date-outfit-men-india" />} />
+              <Route path="party-outfit-men-india" element={<KeywordLandingPage pageKey="party-outfit-men-india" />} />
+              <Route path="college-outfit-men-india" element={<KeywordLandingPage pageKey="college-outfit-men-india" />} />
+              <Route path="men-fashion-dark-skin" element={<KeywordLandingPage pageKey="men-fashion-dark-skin" />} />
+              <Route path="men-fashion-fair-skin" element={<KeywordLandingPage pageKey="men-fashion-fair-skin" />} />
+              <Route path="men-fashion-wheatish-skin" element={<KeywordLandingPage pageKey="men-fashion-wheatish-skin" />} />
+              <Route path="men-fashion-neutral-skin" element={<KeywordLandingPage pageKey="men-fashion-neutral-skin" />} />
               <Route path="faq" element={<ContactPage />} />
               <Route path="shiprocket-demo" element={<ShiprocketPage />} />
               <Route path="login" element={<LoginPage />} />
