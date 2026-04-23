@@ -1,6 +1,7 @@
 // src/components/VideoBanner.jsx
 import React from 'react';
 import bannerVideo from '../assets/banner-video.mp4';
+import LazyVideo from './LazyVideo';
 
 export default function VideoBanner({ videoSrc = bannerVideo }) {
   return (
@@ -17,13 +18,14 @@ export default function VideoBanner({ videoSrc = bannerVideo }) {
       </div>
       <div className="site-shell">
         <div className="relative mt-4 h-[52vh] min-h-[320px] w-full overflow-hidden rounded-2xl bg-black sm:h-[58vh] md:h-[62vh] lg:h-[70vh]">
-          <video
+          <LazyVideo
             className="h-full w-full object-cover"
             src={videoSrc}
             autoPlay
             muted
             loop
             playsInline
+            preload="none"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 text-white">

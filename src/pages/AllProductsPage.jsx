@@ -7,7 +7,11 @@ import ProductCard from '../components/ProductCard';
 import SeoHead from '../components/SeoHead';
 import { useCatalog } from '../contexts/catalog-context';
 import { fetchProductsPage, normaliseTokenValue, toProductCard } from '../lib/api';
-import { TARGET_KEYWORDS } from '../lib/seo';
+import {
+  buildBreadcrumbSchema,
+  buildOrganizationSchema,
+  TARGET_KEYWORDS,
+} from '../lib/seo';
 
 const normalizeForMatch = (value) => {
   const normalized = normaliseTokenValue(value);
@@ -201,10 +205,14 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
       group.tokens.some((token) => normalizeForMatch(token) === skintoneFilter),
     )
     : null;
-  const skintoneTokens = hasExplicitSkintone
-    ? (skintoneGroupFromFilter ? skintoneGroupFromFilter.tokens : [skintoneFilter])
-    : (skintoneFromCategory ? skintoneFromCategory.tokens : []);
-  const occasionTokens = buildOccasionTokens(occasionFilter);
+  const skintoneTokens = useMemo(
+    () =>
+      hasExplicitSkintone
+        ? (skintoneGroupFromFilter ? skintoneGroupFromFilter.tokens : [skintoneFilter])
+        : (skintoneFromCategory ? skintoneFromCategory.tokens : []),
+    [hasExplicitSkintone, skintoneFilter, skintoneFromCategory, skintoneGroupFromFilter],
+  );
+  const occasionTokens = useMemo(() => buildOccasionTokens(occasionFilter), [occasionFilter]);
   const selectedSkintoneKey = hasExplicitSkintone
     ? toCanonicalSkintone(skintoneGroupFromFilter?.id || rawSkintone || skintoneFilter)
     : (isSkintoneCategory ? toCanonicalSkintone(skintoneFromCategory?.id || activeCategory) : '');
@@ -386,7 +394,8 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
     ? displayOccasion
     : (activeCategory === 'all' ? 'All Products' : formatLabel(activeCategory));
   const queryString = searchParams.toString();
-  const canonicalPath = `/products${queryString ? `?${queryString}` : ''}`;
+  const routePath = typeof window !== 'undefined' ? window.location.pathname : '/products';
+  const canonicalPath = routePath || '/products';
   const seoTitle = displaySkintone && displayOccasion
     ? `${displaySkintone} ${displayOccasion} Outfit Ideas for Men`
     : displaySkintone
@@ -454,6 +463,37 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
                 : TARGET_KEYWORDS[3],
         ]}
         canonicalPath={canonicalPath}
+        imageAlt={`${pageTitle} listing page`}
+        noIndex={Boolean(queryString)}
+        structuredData={[
+          buildOrganizationSchema(),
+          {
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            name: pageTitle,
+            description: seoDescription,
+            url: `https://www.thehouseofaradhya.com${canonicalPath}`,
+            mainEntity: {
+              '@type': 'ItemList',
+              itemListElement: sortedProducts.slice(0, 10).map((product, index) => ({
+                '@type': 'ListItem',
+                position: index + 1,
+                url: `https://www.thehouseofaradhya.com/product/${product.handle}`,
+                name: product.title,
+              })),
+            },
+          },
+          buildBreadcrumbSchema([
+            {
+              name: 'Home',
+              url: 'https://www.thehouseofaradhya.com/',
+            },
+            {
+              name: pageTitle,
+              url: `https://www.thehouseofaradhya.com${canonicalPath}`,
+            },
+          ]),
+        ]}
       />
 
       {/* Mobile Header */}

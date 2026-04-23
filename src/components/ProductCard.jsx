@@ -76,8 +76,9 @@ const ProductCard = ({ item, enableImageScroller = false }) => {
       ? imageList[activeImageIndex]
       : imageList[0] || img || featuredImage?.url;
   const imageAlt =
+    featuredImage?.alt ||
     featuredImage?.altText ||
-    (title ? `${title} designer wear for men by Aradhya` : 'Aradhya product image');
+    (title ? `${title} by ${vendor || 'Aradhya'}` : 'Aradhya product image');
   const currencyCode =
     price?.currencyCode ||
     price?.currency ||

@@ -37,7 +37,16 @@ import {
 } from '../lib/api';
 import { trackAddToCart } from '../lib/googleAnalytics';
 import { appendMetaDebugParams, trackMetaAddToCart } from '../lib/metaPixel';
-import { SITE_URL, stripHtml, TARGET_KEYWORDS } from '../lib/seo';
+import {
+  buildAggregateRatingSchema,
+  buildBreadcrumbSchema,
+  buildOrganizationSchema,
+  buildProductSchema,
+  SITE_URL,
+  stripHtml,
+  TARGET_KEYWORDS,
+  truncateText,
+} from '../lib/seo';
 
 const AccordionItem = ({ title, isOpen, onClick, children }) => (
   <div className="border-b border-gray-200">
@@ -235,8 +244,14 @@ const ProductDetails = () => {
     () => parseReviewPayload(product?.reviewsJson),
     [product?.reviewsJson],
   );
-  const reviewItems = hasLoadedReviews ? liveReviewItems : reviewData.items ?? [];
-  const reviewSummary = hasLoadedReviews ? liveReviewSummary : reviewData.summary;
+  const reviewItems = useMemo(
+    () => (hasLoadedReviews ? liveReviewItems : reviewData.items ?? []),
+    [hasLoadedReviews, liveReviewItems, reviewData.items],
+  );
+  const reviewSummary = useMemo(
+    () => (hasLoadedReviews ? liveReviewSummary : reviewData.summary),
+    [hasLoadedReviews, liveReviewSummary, reviewData.summary],
+  );
   const reviewSummaryText = useMemo(() => {
     if (!reviewSummary) return '';
     const averageValue = reviewSummary.average;
@@ -266,11 +281,53 @@ const ProductDetails = () => {
     ? `${product.title} Designer Wear for Men`
     : 'Designer Wear for Men';
   const productSeoDescription = product?.title
-    ? `${product.title} by Aradhya designer wear for men. ${productDescriptionText || 'Discover premium fits, best colour combinations for men, and occasion-ready styling for India.'}`.slice(0, 160)
+    ? truncateText(
+      `${product.title} by Aradhya designer wear for men. ${productDescriptionText || 'Discover premium fits, best colour combinations for men, and occasion-ready styling for India.'}`,
+      160,
+    )
     : 'Aradhya designer wear for men in India with premium outfit combinations.';
   const stylingNote = product?.title
     ? `${product.title} is designed for premium men outfit combination styling, whether you are building a party outfit for men in India, a polished date look, or a refined old money wardrobe.`
     : '';
+  const productPageUrl = `${SITE_URL}/product/${product?.handle || slug}`;
+  const aggregateRatingSchema = useMemo(
+    () => buildAggregateRatingSchema(reviewSummary),
+    [reviewSummary],
+  );
+  const productStructuredData = useMemo(
+    () =>
+      buildProductSchema({
+        name: product?.title,
+        description: productSeoDescription,
+        image: images.map((image) => image?.url).filter(Boolean),
+        sku: String(selectedVariant?.sku || selectedVariant?.id || product?.id || product?.handle || ''),
+        url: productPageUrl,
+        price: Number(selectedVariant?.price ?? product?.price ?? 0),
+        currency: selectedVariant?.currencyCode || product?.currencyCode || 'INR',
+        availability: selectedVariant?.availableForSale === false
+          ? 'https://schema.org/OutOfStock'
+          : 'https://schema.org/InStock',
+        aggregateRating: aggregateRatingSchema,
+        reviews: reviewItems,
+      }),
+    [
+      aggregateRatingSchema,
+      images,
+      product?.currencyCode,
+      product?.handle,
+      product?.id,
+      product?.price,
+      product?.title,
+      productPageUrl,
+      productSeoDescription,
+      reviewItems,
+      selectedVariant?.availableForSale,
+      selectedVariant?.currencyCode,
+      selectedVariant?.id,
+      selectedVariant?.price,
+      selectedVariant?.sku,
+    ],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1218,27 +1275,33 @@ const ProductDetails = () => {
         canonicalPath={`/product/${product.handle || slug}`}
         type="product"
         image={productSeoImage}
-        structuredData={{
-          '@context': 'https://schema.org',
-          '@type': 'Product',
-          name: product.title,
-          description: productSeoDescription,
-          image: images.map((image) => image?.url).filter(Boolean),
-          sku: String(selectedVariant?.sku || selectedVariant?.id || product.id || product.handle || ''),
-          brand: {
-            '@type': 'Brand',
-            name: 'Aradhya',
-          },
-          offers: {
-            '@type': 'Offer',
-            priceCurrency: selectedVariant?.currencyCode || product?.currencyCode || 'INR',
-            price: Number(selectedVariant?.price ?? product?.price ?? 0),
-            availability: selectedVariant?.availableForSale === false
-              ? 'https://schema.org/OutOfStock'
-              : 'https://schema.org/InStock',
-            url: `${SITE_URL}/product/${product.handle || slug}`,
-          },
-        }}
+        imageAlt={product?.title || 'Product image'}
+        structuredData={[
+          buildOrganizationSchema(),
+          buildBreadcrumbSchema([
+            {
+              name: 'Home',
+              url: SITE_URL,
+            },
+            {
+              name: 'Products',
+              url: `${SITE_URL}/products`,
+            },
+            ...(product?.collections?.[0]?.title
+              ? [
+                {
+                  name: product.collections[0].title,
+                  url: `${SITE_URL}/collections/${product.collections[0].handle}`,
+                },
+              ]
+              : []),
+            {
+              name: product.title,
+              url: productPageUrl,
+            },
+          ]),
+          productStructuredData,
+        ]}
       />
 
       {/* Mobile Top Section: Image, Overlay Header */}

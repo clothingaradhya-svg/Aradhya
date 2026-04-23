@@ -6,7 +6,11 @@ import ProductCard from '../components/ProductCard';
 import SeoHead from '../components/SeoHead';
 import { useCatalog } from '../contexts/catalog-context';
 import { normaliseTokenValue, toProductCard, fetchCollectionByHandle } from '../lib/api';
-import { TARGET_KEYWORDS } from '../lib/seo';
+import {
+    buildBreadcrumbSchema,
+    buildOrganizationSchema,
+    TARGET_KEYWORDS,
+} from '../lib/seo';
 
 const normalizeForMatch = (value) => {
     const normalized = normaliseTokenValue(value);
@@ -176,7 +180,7 @@ const CollectionPage = () => {
     const collectionTitle = collectionInfo?.title || formatLabel(handle);
     const displaySkintone = formatLabel(skintoneFilter);
     const queryString = searchParams.toString();
-    const canonicalPath = `/collections/${handle}${queryString ? `?${queryString}` : ''}`;
+    const canonicalPath = `/collections/${handle}`;
     const seoTitle = displaySkintone
         ? `${collectionTitle} for ${displaySkintone} Men`
         : `${collectionTitle} Designer Wear for Men`;
@@ -199,6 +203,42 @@ const CollectionPage = () => {
                     TARGET_KEYWORDS[13],
                 ]}
                 canonicalPath={canonicalPath}
+                image={collectionInfo?.image?.url}
+                imageAlt={`${collectionTitle} collection`}
+                noIndex={Boolean(queryString)}
+                structuredData={[
+                    buildOrganizationSchema(),
+                    {
+                        '@context': 'https://schema.org',
+                        '@type': 'CollectionPage',
+                        name: collectionTitle,
+                        description: seoDescription,
+                        url: `https://www.thehouseofaradhya.com${canonicalPath}`,
+                        mainEntity: {
+                            '@type': 'ItemList',
+                            itemListElement: sortedProducts.slice(0, 10).map((product, index) => ({
+                                '@type': 'ListItem',
+                                position: index + 1,
+                                url: `https://www.thehouseofaradhya.com/product/${product.handle}`,
+                                name: product.title,
+                            })),
+                        },
+                    },
+                    buildBreadcrumbSchema([
+                        {
+                            name: 'Home',
+                            url: 'https://www.thehouseofaradhya.com/',
+                        },
+                        {
+                            name: 'Collections',
+                            url: 'https://www.thehouseofaradhya.com/products',
+                        },
+                        {
+                            name: collectionTitle,
+                            url: `https://www.thehouseofaradhya.com${canonicalPath}`,
+                        },
+                    ]),
+                ]}
             />
 
             <MobilePageHeader

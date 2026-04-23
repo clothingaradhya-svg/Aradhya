@@ -10,7 +10,12 @@ import SeoHead from '../components/SeoHead';
 import { blogArticles } from '../content/blogArticles';
 import { useCatalog } from '../contexts/catalog-context';
 import { fetchHomepageProducts, toProductCard } from '../lib/api';
-import { TARGET_KEYWORDS } from '../lib/seo';
+import {
+  buildBreadcrumbSchema,
+  buildOrganizationSchema,
+  buildWebsiteSchema,
+  TARGET_KEYWORDS,
+} from '../lib/seo';
 import heroVideo from '../assets/Coin_in_Nature_Climate_Video.mp4';
 
 const PRIMARY_HANDLE = import.meta.env.VITE_HOME_PRIMARY_COLLECTION ?? null;
@@ -210,13 +215,31 @@ export default function HomePage() {
           TARGET_KEYWORDS[13],
         ]}
         canonicalPath="/"
-        structuredData={{
-          '@context': 'https://schema.org',
-          '@type': 'WebPage',
-          name: 'Aradhya designer wear for men',
-          description:
-            'Aradhya designer wear for men in India with outfit combinations by skin tone, occasion, and budget.',
-        }}
+        imageAlt="The House of Aradhya home page"
+        structuredData={[
+          buildOrganizationSchema({
+            description:
+              'Aradhya designer wear for men in India with outfit combinations by skin tone, occasion, and budget.',
+          }),
+          buildWebsiteSchema({
+            description:
+              'Aradhya designer wear for men in India with outfit combinations by skin tone, occasion, and budget.',
+          }),
+          {
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: 'Aradhya designer wear for men',
+            description:
+              'Aradhya designer wear for men in India with outfit combinations by skin tone, occasion, and budget.',
+            url: 'https://www.thehouseofaradhya.com/',
+          },
+          buildBreadcrumbSchema([
+            {
+              name: 'Home',
+              url: 'https://www.thehouseofaradhya.com/',
+            },
+          ]),
+        ]}
       />
 
       <div className="relative">

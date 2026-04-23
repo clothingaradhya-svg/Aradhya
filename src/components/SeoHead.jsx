@@ -1,5 +1,11 @@
 import { useEffect } from 'react';
-import { buildCanonicalUrl, createKeywordList, SITE_NAME, SITE_URL } from '../lib/seo';
+import {
+  buildCanonicalUrl,
+  createKeywordList,
+  DEFAULT_LOCALE,
+  DEFAULT_SOCIAL_IMAGE,
+  SITE_NAME,
+} from '../lib/seo';
 
 const upsertMetaTag = (selector, attributes, content) => {
   let element = document.head.querySelector(selector);
@@ -30,24 +36,32 @@ const upsertLinkTag = (selector, attributes, href) => {
 };
 
 const upsertStructuredData = (data) => {
-  const scriptId = 'seo-structured-data';
-  let element = document.head.querySelector(`#${scriptId}`);
+  const scripts = Array.isArray(data) ? data.filter(Boolean) : data ? [data] : [];
+  const existing = Array.from(document.head.querySelectorAll('script[data-seo-structured-data="true"]'));
 
-  if (!data) {
-    if (element) {
-      element.remove();
-    }
+  if (!scripts.length) {
+    existing.forEach((element) => element.remove());
     return;
   }
 
-  if (!element) {
-    element = document.createElement('script');
-    element.id = scriptId;
-    element.type = 'application/ld+json';
-    document.head.appendChild(element);
-  }
+  scripts.forEach((entry, index) => {
+    const scriptId = `seo-structured-data-${index}`;
+    let element = document.head.querySelector(`#${scriptId}`);
 
-  element.textContent = JSON.stringify(data);
+    if (!element) {
+      element = document.createElement('script');
+      element.id = scriptId;
+      element.type = 'application/ld+json';
+      element.setAttribute('data-seo-structured-data', 'true');
+      document.head.appendChild(element);
+    }
+
+    element.textContent = JSON.stringify(entry);
+  });
+
+  existing
+    .filter((element) => Number(element.id.replace('seo-structured-data-', '')) >= scripts.length)
+    .forEach((element) => element.remove());
 };
 
 const SeoHead = ({
@@ -56,20 +70,23 @@ const SeoHead = ({
   keywords = [],
   canonicalPath = '/',
   type = 'website',
-  image = `${SITE_URL}/aradhya-logo.png`,
+  image = DEFAULT_SOCIAL_IMAGE,
+  imageAlt = SITE_NAME,
   structuredData = null,
   noIndex = false,
 }) => {
   useEffect(() => {
     const finalTitle = title ? `${title} | ${SITE_NAME}` : SITE_NAME;
-    const finalDescription = description || `${SITE_NAME} men's designer wear in India.`;
+    const finalDescription = description || `${SITE_NAME} premium ecommerce store in India.`;
     const finalKeywords = createKeywordList(keywords);
     const canonicalUrl = buildCanonicalUrl(canonicalPath);
 
     document.title = finalTitle;
 
     upsertMetaTag('meta[name="description"]', { name: 'description' }, finalDescription);
-    upsertMetaTag('meta[name="keywords"]', { name: 'keywords' }, finalKeywords.join(', '));
+    if (finalKeywords.length) {
+      upsertMetaTag('meta[name="keywords"]', { name: 'keywords' }, finalKeywords.join(', '));
+    }
     upsertMetaTag(
       'meta[name="robots"]',
       { name: 'robots' },
@@ -85,13 +102,16 @@ const SeoHead = ({
     upsertMetaTag('meta[property="og:type"]', { property: 'og:type' }, type);
     upsertMetaTag('meta[property="og:url"]', { property: 'og:url' }, canonicalUrl);
     upsertMetaTag('meta[property="og:site_name"]', { property: 'og:site_name' }, SITE_NAME);
+    upsertMetaTag('meta[property="og:locale"]', { property: 'og:locale' }, DEFAULT_LOCALE);
     upsertMetaTag('meta[property="og:image"]', { property: 'og:image' }, image);
+    upsertMetaTag('meta[property="og:image:alt"]', { property: 'og:image:alt' }, imageAlt);
 
     upsertMetaTag(
       'meta[name="twitter:card"]',
       { name: 'twitter:card' },
       'summary_large_image',
     );
+    upsertMetaTag('meta[name="twitter:site"]', { name: 'twitter:site' }, '@thehouseofaradhya');
     upsertMetaTag('meta[name="twitter:title"]', { name: 'twitter:title' }, finalTitle);
     upsertMetaTag(
       'meta[name="twitter:description"]',
@@ -99,10 +119,11 @@ const SeoHead = ({
       finalDescription,
     );
     upsertMetaTag('meta[name="twitter:image"]', { name: 'twitter:image' }, image);
+    upsertMetaTag('meta[name="twitter:image:alt"]', { name: 'twitter:image:alt' }, imageAlt);
 
     upsertLinkTag('link[rel="canonical"]', { rel: 'canonical' }, canonicalUrl);
     upsertStructuredData(structuredData);
-  }, [canonicalPath, description, image, keywords, noIndex, structuredData, title, type]);
+  }, [canonicalPath, description, image, imageAlt, keywords, noIndex, structuredData, title, type]);
 
   return null;
 };

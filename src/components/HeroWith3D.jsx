@@ -36,6 +36,7 @@ export default function HeroWith3D({ heroVideoSrc, ctaLabel = 'Select Skintone',
         muted
         loop
         playsInline
+        preload="metadata"
         style={{ transform: `translateY(${parallaxOffset}px)` }}
       />
 

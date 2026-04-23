@@ -1,20 +1,19 @@
 User-agent: *
 Allow: /
 
-# Important pages ko allow rehne do
-Allow: /wp-content/uploads/
-Allow: /wp-admin/admin-ajax.php
+Disallow: /admin
+Disallow: /admin/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /checkout/
+Disallow: /login
+Disallow: /register
+Disallow: /profile
+Disallow: /wishlist
+Disallow: /search
+Disallow: /*?*sort=
+Disallow: /*?*utm_
+Disallow: /*?*fbclid=
+Disallow: /*?*gclid=
 
-# Unnecessary ya sensitive areas block karo
-Disallow: /wp-admin/
-Disallow: /wp-includes/
-Disallow: /cgi-bin/
-Disallow: /readme.html
-
-# Search & filter URLs block (duplicate content avoid)
-Disallow: /*?s=
-Disallow: /*?filter=
-Disallow: /*?orderby=
-
-# Sitemap add karo (VERY IMPORTANT)
-Sitemap: https://thehouseofaradhya.com/sitemap.xml
+Sitemap: https://www.thehouseofaradhya.com/sitemap.xml

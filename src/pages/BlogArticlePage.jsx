@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import SeoHead from '../components/SeoHead';
 import { blogArticlesBySlug, blogArticles } from '../content/blogArticles';
+import { buildBreadcrumbSchema, buildOrganizationSchema } from '../lib/seo';
 
 const BlogArticlePage = () => {
   const { slug } = useParams();
@@ -22,22 +23,40 @@ const BlogArticlePage = () => {
         canonicalPath={`/blog/${article.slug}`}
         type="article"
         image={`https://www.thehouseofaradhya.com${article.coverImage}`}
-        structuredData={{
-          '@context': 'https://schema.org',
-          '@type': 'Article',
-          headline: article.title,
-          description: article.description,
-          image: `https://www.thehouseofaradhya.com${article.coverImage}`,
-          author: {
-            '@type': 'Organization',
-            name: 'Aradhya',
+        imageAlt={article.coverAlt}
+        structuredData={[
+          buildOrganizationSchema(),
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            headline: article.title,
+            description: article.description,
+            image: `https://www.thehouseofaradhya.com${article.coverImage}`,
+            author: {
+              '@type': 'Organization',
+              name: 'Aradhya',
+            },
+            publisher: {
+              '@type': 'Organization',
+              name: 'Aradhya',
+            },
+            mainEntityOfPage: `https://www.thehouseofaradhya.com/blog/${article.slug}`,
           },
-          publisher: {
-            '@type': 'Organization',
-            name: 'Aradhya',
-          },
-          mainEntityOfPage: `https://www.thehouseofaradhya.com/blog/${article.slug}`,
-        }}
+          buildBreadcrumbSchema([
+            {
+              name: 'Home',
+              url: 'https://www.thehouseofaradhya.com/',
+            },
+            {
+              name: 'Blog',
+              url: 'https://www.thehouseofaradhya.com/blog',
+            },
+            {
+              name: article.title,
+              url: `https://www.thehouseofaradhya.com/blog/${article.slug}`,
+            },
+          ]),
+        ]}
       />
 
       <div className="site-shell max-w-4xl">

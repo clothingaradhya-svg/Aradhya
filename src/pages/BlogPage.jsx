@@ -2,7 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import SeoHead from '../components/SeoHead';
 import { blogArticles } from '../content/blogArticles';
-import { TARGET_KEYWORDS } from '../lib/seo';
+import {
+  buildBreadcrumbSchema,
+  buildOrganizationSchema,
+  TARGET_KEYWORDS,
+} from '../lib/seo';
 
 const BlogPage = () => {
   return (
@@ -12,14 +16,28 @@ const BlogPage = () => {
         description="Read India-focused men's fashion guides from Aradhya designer wear, including men outfit combinations, skin tone styling, occasion looks, and old money outfits."
         keywords={TARGET_KEYWORDS}
         canonicalPath="/blog"
-        structuredData={{
-          '@context': 'https://schema.org',
-          '@type': 'Blog',
-          name: 'Aradhya Blog',
-          description:
-            "Men's fashion blog covering skintone based outfit combinations for men, budget outfits, and occasion styling in India.",
-          url: 'https://www.thehouseofaradhya.com/blog',
-        }}
+        imageAlt="Aradhya blog"
+        structuredData={[
+          buildOrganizationSchema(),
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Blog',
+            name: 'Aradhya Blog',
+            description:
+              "Men's fashion blog covering skintone based outfit combinations for men, budget outfits, and occasion styling in India.",
+            url: 'https://www.thehouseofaradhya.com/blog',
+          },
+          buildBreadcrumbSchema([
+            {
+              name: 'Home',
+              url: 'https://www.thehouseofaradhya.com/',
+            },
+            {
+              name: 'Blog',
+              url: 'https://www.thehouseofaradhya.com/blog',
+            },
+          ]),
+        ]}
       />
 
       <div className="site-shell">
