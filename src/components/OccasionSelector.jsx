@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import OptimizedImage from './OptimizedImage';
 
 const image = (file) => `${import.meta.env?.BASE_URL ?? '/'}images/${file}`;
+const imageWebp = (file) =>
+  `${import.meta.env?.BASE_URL ?? '/'}images/${file.replace(/\.(jpg|jpeg|png)$/i, '.webp')}`;
 
 const occasions = [
     {
@@ -9,18 +12,21 @@ const occasions = [
         title: 'Date Wear',
         tag: 'Date Wear',
         image: image('occasion-date.jpg'),
+        webp: imageWebp('occasion-date.jpg'),
     },
     {
         id: 'puja',
         title: 'Puja Wear',
         tag: 'Puja Wear',
         image: image('occasion-puja.jpg'),
+        webp: imageWebp('occasion-puja.jpg'),
     },
     {
         id: 'office',
         title: 'Office Wear',
         tag: 'Office Wear',
         image: image('occasion-office.jpg'),
+        webp: imageWebp('occasion-office.jpg'),
     }
 ];
 
@@ -42,11 +48,13 @@ export default function OccasionSelector({ selectedSkintone }) {
                         className="group block overflow-hidden rounded-2xl border border-white/40 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                         aria-label={occasion.title}
                     >
-                        <img
+                        <OptimizedImage
                             src={occasion.image}
+                            sources={[{ srcSet: occasion.webp, type: 'image/webp' }]}
                             alt={`${occasion.title} outfit ideas for men in India`}
                             className="block w-full h-auto transition-transform duration-700 group-hover:scale-[1.02]"
-                            loading="lazy"
+                            width={640}
+                            height={800}
                         />
                     </Link>
                 ))}

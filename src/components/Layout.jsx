@@ -1,5 +1,5 @@
 // src/components/Layout.jsx
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
@@ -7,9 +7,10 @@ import CatalogProvider from '../contexts/catalog-context';
 import CartProvider from '../contexts/cart-context';
 import WishlistProvider from '../contexts/wishlist-context';
 import NotificationProvider from './NotificationProvider';
-import SearchOverlay from './SearchOverlay';
-import CartDrawer from './CartDrawer';
 import BottomNav from './BottomNav';
+
+const SearchOverlay = lazy(() => import('./SearchOverlay'));
+const CartDrawer = lazy(() => import('./CartDrawer'));
 
 const marqueeItems = [
   'THE HOUSE OF ARADHYA',
@@ -82,8 +83,14 @@ const Layout = () => {
 
               <Footer />
 
-              <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
-              <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+              <Suspense fallback={null}>
+                {searchOpen ? (
+                  <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+                ) : null}
+                {cartOpen ? (
+                  <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+                ) : null}
+              </Suspense>
               <BottomNav onSearchClick={() => setSearchOpen(true)} onCartClick={() => setCartOpen(true)} />
             </div>
           </NotificationProvider>

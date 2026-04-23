@@ -28,6 +28,7 @@ const checkoutRoutes = require('./src/routes/checkout.routes');
 const discountRoutes = require('./src/routes/discount.routes');
 
 const app = express();
+app.disable('x-powered-by');
 
 const normalizeOrigin = (value) =>
   typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
@@ -101,7 +102,31 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(compression());
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+}));
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return next();
+  }
+
+  if (req.path.startsWith('/api/products') || req.path.startsWith('/api/collections')) {
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  } else if (req.path.startsWith('/api/reviews')) {
+    res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+  } else if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+  }
+
+  return next();
+});
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/', (_req, res) => {

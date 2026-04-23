@@ -1,23 +1,24 @@
 import React from 'react';
-import fairImg from '@/assets/images/skintone-fair.png';
-import neutralImg from '@/assets/images/skintone-neutral.png';
-import darkImg from '@/assets/images/skintone-dark.png';
+import OptimizedImage from './OptimizedImage';
 
 const skintones = [
   {
     id: 'fair-skin',
     label: 'FAIR SKINTONE',
-    image: fairImg,
+    image: '/images/skintone-fair.png',
+    webp: '/images/skintone-fair.webp',
   },
   {
     id: 'neutral-skin',
     label: 'NEUTRAL SKINTONE',
-    image: neutralImg,
+    image: '/images/skintone-neutral.png',
+    webp: '/images/skintone-neutral.webp',
   },
   {
     id: 'dark-skin',
     label: 'DARK SKINTONE',
-    image: darkImg,
+    image: '/images/skintone-dark.png',
+    webp: '/images/skintone-dark.webp',
   },
 ];
 
@@ -37,11 +38,13 @@ export default function SkintoneSelector({ onSelect }) {
               onClick={() => onSelect?.(tone.id)}
               className="block w-full"
             >
-              <img
+              <OptimizedImage
                 src={tone.image}
+                sources={[{ srcSet: tone.webp, type: 'image/webp' }]}
                 alt={`${tone.label} outfit combinations for men`}
                 className="block w-full h-auto"
-                loading="lazy"
+                width={768}
+                height={960}
               />
             </button>
           ))}

@@ -20,6 +20,8 @@ import heroVideo from '../assets/Coin_in_Nature_Climate_Video.mp4';
 
 const PRIMARY_HANDLE = import.meta.env.VITE_HOME_PRIMARY_COLLECTION ?? null;
 const SECONDARY_HANDLE = import.meta.env.VITE_HOME_SECONDARY_COLLECTION ?? null;
+const HERO_POSTER = '/images/hero-poster.jpg';
+const HERO_POSTER_WEBP = '/images/hero-poster.webp';
 
 export default function HomePage() {
   const { products: catalogProducts, ensureCollectionProducts } = useCatalog();
@@ -216,6 +218,7 @@ export default function HomePage() {
         ]}
         canonicalPath="/"
         imageAlt="The House of Aradhya home page"
+        preloadImages={[HERO_POSTER_WEBP]}
         structuredData={[
           buildOrganizationSchema({
             description:
@@ -249,59 +252,70 @@ export default function HomePage() {
 
         <HeroWith3D
           heroVideoSrc={heroVideo}
+          heroPoster={HERO_POSTER}
+          heroSources={[
+            { srcSet: HERO_POSTER_WEBP, type: 'image/webp' },
+          ]}
+          eyebrow="Men's Designer Wear"
+          title="Aradhya Designer Wear for Men in India"
+          description="Premium men outfit combinations, skintone-based styling, and occasion-ready looks designed to feel sharp from the first click."
           ctaLabel="Select Skintone"
           onCtaClick={handleSkintoneScroll}
         />
       </div>
 
-      <section className="site-shell py-10 md:py-14">
+      <section className="site-shell py-8 md:py-12">
         <div className="mx-auto max-w-4xl space-y-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-gray-500">
-            Men&apos;s Designer Wear
+            Curated combinations
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-5xl">
-            Aradhya Designer Wear for Men in India
-          </h1>
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+            Premium combinations by skin tone, occasion, and budget
+          </h2>
           <p className="text-sm leading-7 text-gray-600 md:text-base">
-            Explore Aradhya designer wear for elevated men outfit combination ideas, from
-            skintone based outfit combinations for men to old money outfits for men in India.
-            Whether you want a sharp party look, a polished date outfit, or a men outfit under
-            2500, our collections are designed to make premium styling feel effortless.
+            Explore Aradhya designer wear for elevated outfit combinations, from skintone-based
+            coordination to old money styling and premium men&apos;s looks under 2500.
           </p>
         </div>
       </section>
 
-      <div id="skintone-selector" className="site-shell pb-4 pt-6 md:pb-6 md:pt-8">
+      <div id="skintone-selector" className="site-shell cv-auto pb-4 pt-6 md:pb-6 md:pt-8">
         <SkintoneSelector onSelect={setSelectedSkintone} />
       </div>
 
       {selectedSkintone && (
-        <div id="occasion-selector">
+        <div id="occasion-selector" className="cv-auto">
           <OccasionSelector selectedSkintone={selectedSkintone} />
         </div>
       )}
 
-      <ProductGrid
-        title={latestTitle}
-        products={latestProducts}
-        ctaHref="/products?category=t-shirts"
-        ctaLabel="Shop Now"
-        loading={latestLoading}
-        enableImageScroller
-      />
+      <div className="cv-auto">
+        <ProductGrid
+          title={latestTitle}
+          products={latestProducts}
+          ctaHref="/products?category=t-shirts"
+          ctaLabel="Shop Now"
+          loading={latestLoading}
+          enableImageScroller
+        />
+      </div>
 
-      <VideoBanner />
+      <div className="cv-auto">
+        <VideoBanner />
+      </div>
 
-      <ProductGrid
-        title={moreTitle}
-        products={moreProducts}
-        ctaHref="/products"
-        ctaLabel="View All"
-        loading={moreLoading}
-        enableImageScroller
-      />
+      <div className="cv-auto">
+        <ProductGrid
+          title={moreTitle}
+          products={moreProducts}
+          ctaHref="/products"
+          ctaLabel="View All"
+          loading={moreLoading}
+          enableImageScroller
+        />
+      </div>
 
-      <section className="site-shell pb-16 pt-4 md:pb-20">
+      <section className="site-shell cv-auto pb-16 pt-4 md:pb-20">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-slate-950 md:text-3xl">

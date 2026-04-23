@@ -12,32 +12,49 @@ import {
   trackMetaPageView,
 } from '../lib/metaPixel';
 
+const scheduleNonCriticalWork = (callback, timeout = 1800) => {
+  if (typeof window === 'undefined') return () => {};
+
+  if ('requestIdleCallback' in window) {
+    const id = window.requestIdleCallback(callback, { timeout });
+    return () => window.cancelIdleCallback(id);
+  }
+
+  const id = window.setTimeout(callback, Math.min(timeout, 1200));
+  return () => window.clearTimeout(id);
+};
+
 const AnalyticsTracker = () => {
   const { pathname, search } = useLocation();
   const hasTrackedInitialPage = useRef(false);
 
   useEffect(() => {
-    const hasGoogleAnalytics = Boolean(getAnalyticsMeasurementId());
+    let cancelled = false;
+    const cleanupIdleTask = scheduleNonCriticalWork(() => {
+      if (cancelled) return;
 
-    if (hasGoogleAnalytics) {
-      initializeAnalytics();
-    }
+      const hasGoogleAnalytics = Boolean(getAnalyticsMeasurementId());
 
-    ensureMetaPixelReady();
-    syncMetaDebugQueryParams();
+      if (hasGoogleAnalytics) {
+        initializeAnalytics();
+        trackPageView({ pathname, search });
+      }
 
-    if (hasTrackedInitialPage.current && hasGoogleAnalytics) {
-      trackPageView({ pathname, search });
-    }
-
-    trackMetaPageView({ pathname, search });
-    hasTrackedInitialPage.current = true;
+      ensureMetaPixelReady();
+      syncMetaDebugQueryParams();
+      trackMetaPageView({ pathname, search });
+      hasTrackedInitialPage.current = true;
+    }, hasTrackedInitialPage.current ? 600 : 2200);
 
     const flushTimer = window.setTimeout(() => {
-      flushPendingAnalyticsEvents();
-    }, 3000);
+      if (!cancelled) {
+        flushPendingAnalyticsEvents();
+      }
+    }, 3500);
 
     return () => {
+      cancelled = true;
+      cleanupIdleTask();
       window.clearTimeout(flushTimer);
     };
   }, [pathname, search]);

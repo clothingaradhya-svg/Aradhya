@@ -30,6 +30,35 @@ const initialState = {
 
 const DEFAULT_PRODUCT_LIMIT = Number(import.meta.env.VITE_CATALOG_LIMIT) || 36;
 
+const scheduleCatalogBootstrap = (callback) => {
+  if (typeof window === 'undefined') {
+    callback();
+    return () => {};
+  }
+
+  const run = () => {
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(callback, { timeout: 2500 });
+      cleanup = () => window.cancelIdleCallback(idleId);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(callback, 1200);
+    cleanup = () => window.clearTimeout(timeoutId);
+  };
+
+  let cleanup = () => {};
+
+  if (document.readyState === 'complete') {
+    run();
+  } else {
+    window.addEventListener('load', run, { once: true });
+    cleanup = () => window.removeEventListener('load', run);
+  }
+
+  return cleanup;
+};
+
 export const CatalogProvider = ({ children, productLimit = DEFAULT_PRODUCT_LIMIT }) => {
   const [state, setState] = useState(initialState);
   const [collectionCache, setCollectionCache] = useState({});
@@ -99,10 +128,11 @@ export const CatalogProvider = ({ children, productLimit = DEFAULT_PRODUCT_LIMIT
       }
     }
 
-    loadCatalogue();
+    const cancelBootstrap = scheduleCatalogBootstrap(loadCatalogue);
 
     return () => {
       cancelled = true;
+      cancelBootstrap();
     };
   }, [productLimit]);
 

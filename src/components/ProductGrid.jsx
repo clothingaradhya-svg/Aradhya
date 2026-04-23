@@ -1,8 +1,7 @@
-import React from "react";
-import { motion as Motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
-import { Link } from "react-router-dom";
-import ProductCard from "./ProductCard";
+import React from 'react';
+import { ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import ProductCard from './ProductCard';
 
 const SectionHeader = ({ title, ctaHref, ctaLabel }) => (
   <div className="flex flex-col gap-4 border-t border-neutral-200 py-4 uppercase md:flex-row md:items-center md:justify-between">
@@ -16,11 +15,6 @@ const SectionHeader = ({ title, ctaHref, ctaLabel }) => (
     </Link>
   </div>
 );
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 40 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
-};
 
 const ProductCardSkeleton = () => (
   <div className="overflow-hidden rounded-md border border-neutral-200 bg-white">
@@ -36,8 +30,8 @@ const ProductCardSkeleton = () => (
 export default function ProductGrid({
   title,
   products = [],
-  ctaHref = "/products",
-  ctaLabel = "Discover More",
+  ctaHref = '/products',
+  ctaLabel = 'Discover More',
   loading = false,
   enableImageScroller = false,
 }) {
@@ -55,16 +49,9 @@ export default function ProductGrid({
         {showSkeleton
           ? skeletonItems.map((item) => <ProductCardSkeleton key={`skeleton-${item}`} />)
           : products.map((item, idx) => (
-              <Motion.div
-                key={item.title + idx}
-                variants={cardVariants}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, amount: 0.3 }}
-                className="h-full"
-              >
+              <div key={item.title + idx} className="h-full">
                 <ProductCard item={item} enableImageScroller={enableImageScroller} />
-              </Motion.div>
+              </div>
             ))}
       </div>
 

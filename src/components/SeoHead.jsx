@@ -35,6 +35,34 @@ const upsertLinkTag = (selector, attributes, href) => {
   element.setAttribute('href', href);
 };
 
+const syncPreloadImages = (images = []) => {
+  const uniqueImages = Array.from(
+    new Set((Array.isArray(images) ? images : []).map((item) => String(item || '').trim()).filter(Boolean)),
+  );
+  const existing = Array.from(document.head.querySelectorAll('link[data-seo-preload-image="true"]'));
+
+  uniqueImages.forEach((href, index) => {
+    const selector = `link[data-seo-preload-image="true"][data-preload-index="${index}"]`;
+    let element = document.head.querySelector(selector);
+
+    if (!element) {
+      element = document.createElement('link');
+      element.rel = 'preload';
+      element.as = 'image';
+      element.setAttribute('data-seo-preload-image', 'true');
+      element.setAttribute('data-preload-index', String(index));
+      document.head.appendChild(element);
+    }
+
+    element.href = href;
+    element.setAttribute('fetchpriority', 'high');
+  });
+
+  existing
+    .filter((element) => Number(element.getAttribute('data-preload-index')) >= uniqueImages.length)
+    .forEach((element) => element.remove());
+};
+
 const upsertStructuredData = (data) => {
   const scripts = Array.isArray(data) ? data.filter(Boolean) : data ? [data] : [];
   const existing = Array.from(document.head.querySelectorAll('script[data-seo-structured-data="true"]'));
@@ -72,6 +100,7 @@ const SeoHead = ({
   type = 'website',
   image = DEFAULT_SOCIAL_IMAGE,
   imageAlt = SITE_NAME,
+  preloadImages = [],
   structuredData = null,
   noIndex = false,
 }) => {
@@ -122,8 +151,9 @@ const SeoHead = ({
     upsertMetaTag('meta[name="twitter:image:alt"]', { name: 'twitter:image:alt' }, imageAlt);
 
     upsertLinkTag('link[rel="canonical"]', { rel: 'canonical' }, canonicalUrl);
+    syncPreloadImages(preloadImages);
     upsertStructuredData(structuredData);
-  }, [canonicalPath, description, image, imageAlt, keywords, noIndex, structuredData, title, type]);
+  }, [canonicalPath, description, image, imageAlt, keywords, noIndex, preloadImages, structuredData, title, type]);
 
   return null;
 };

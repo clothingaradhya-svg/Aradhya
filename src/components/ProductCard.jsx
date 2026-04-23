@@ -138,6 +138,7 @@ const ProductCard = ({ item, enableImageScroller = false }) => {
                 alt={imageAlt}
                 className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gray-50 text-gray-300">
