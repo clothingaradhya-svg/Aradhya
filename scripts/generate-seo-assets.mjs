@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { blogArticles } from '../src/content/blogArticles.js';
-import { SITE_URL } from '../src/lib/seo.js';
+import { DEFAULT_SOCIAL_IMAGE, SITE_URL } from '../src/lib/seo.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,17 +12,29 @@ const publicDir = path.join(projectRoot, 'public');
 
 const API_BASE = (process.env.SEO_API_BASE_URL || SITE_URL).replace(/\/+$/, '');
 const PAGE_SIZE = 200;
+const buildTimestamp = new Date().toISOString();
 
 const STATIC_ROUTES = [
-  { path: '/', changefreq: 'daily', priority: '1.0' },
+  { path: '/', changefreq: 'daily', priority: '1.0', image: '/images/hero-poster.webp' },
   { path: '/products', changefreq: 'daily', priority: '0.9' },
-  { path: '/about', changefreq: 'monthly', priority: '0.6' },
-  { path: '/contact', changefreq: 'monthly', priority: '0.6' },
-  { path: '/blog', changefreq: 'weekly', priority: '0.7' },
-  { path: '/cancel-refund-exchange', changefreq: 'monthly', priority: '0.4' },
+  { path: '/collections/fair-skin', changefreq: 'weekly', priority: '0.9', image: '/images/skintone-fair.webp' },
+  { path: '/collections/neutral-skin', changefreq: 'weekly', priority: '0.9', image: '/images/skintone-neutral.webp' },
+  { path: '/collections/dark-skin', changefreq: 'weekly', priority: '0.9', image: '/images/skintone-dark.webp' },
+  { path: '/shoes', changefreq: 'weekly', priority: '0.9' },
+  { path: '/shoes/loafers', changefreq: 'weekly', priority: '0.9' },
+  { path: '/shoes/boots', changefreq: 'weekly', priority: '0.9' },
+  { path: '/shoes/sneakers', changefreq: 'weekly', priority: '0.9' },
+  { path: '/shoes/sandals', changefreq: 'weekly', priority: '0.9' },
+  { path: '/about', changefreq: 'monthly', priority: '0.5' },
+  { path: '/contact', changefreq: 'monthly', priority: '0.5' },
+  { path: '/faq', changefreq: 'monthly', priority: '0.5' },
+  { path: '/blog', changefreq: 'weekly', priority: '0.6' },
+  { path: '/cancel-refund-exchange', changefreq: 'monthly', priority: '0.3' },
   { path: '/legal/privacy-policy', changefreq: 'monthly', priority: '0.3' },
   { path: '/legal/terms-of-use', changefreq: 'monthly', priority: '0.3' },
+  { path: '/legal/money-back-policy', changefreq: 'monthly', priority: '0.3' },
   { path: '/legal/refund-return-policy', changefreq: 'monthly', priority: '0.3' },
+  { path: '/legal/refund-process', changefreq: 'monthly', priority: '0.3' },
   { path: '/legal/cookie-policy', changefreq: 'monthly', priority: '0.3' },
 ];
 
@@ -35,6 +47,84 @@ const escapeXml = (value) =>
     .replace(/'/g, '&apos;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+
+const normalizeDate = (value, fallback = buildTimestamp) => {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return date.toISOString();
+};
+
+const normalizeImageUrl = (value) => {
+  if (!value) return null;
+  const source = String(value).trim();
+  if (!source) return null;
+  return source.startsWith('http://') || source.startsWith('https://')
+    ? source
+    : toAbsoluteUrl(source.startsWith('/') ? source : `/${source}`);
+};
+
+const normalizeImageAlt = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+
+const uniqueImages = (images = []) => {
+  const seen = new Set();
+  return images.filter((image) => {
+    const key = `${image.loc}::${image.caption || ''}`;
+    if (!image.loc || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+function createUrlsetXml(urls, { includeImages = false } = {}) {
+  const xmlns = includeImages
+    ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
+    : '';
+
+  const body = urls
+    .map((entry) => {
+      const parts = [
+        '  <url>',
+        `    <loc>${escapeXml(entry.loc)}</loc>`,
+        `    <lastmod>${escapeXml(entry.lastmod || buildTimestamp)}</lastmod>`,
+        `    <changefreq>${escapeXml(entry.changefreq || 'weekly')}</changefreq>`,
+        `    <priority>${escapeXml(entry.priority || '0.5')}</priority>`,
+      ];
+
+      if (includeImages) {
+        uniqueImages(entry.images).forEach((image) => {
+          parts.push('    <image:image>');
+          parts.push(`      <image:loc>${escapeXml(image.loc)}</image:loc>`);
+          if (image.caption) {
+            parts.push(`      <image:caption>${escapeXml(image.caption)}</image:caption>`);
+          }
+          parts.push('    </image:image>');
+        });
+      }
+
+      parts.push('  </url>');
+      return parts.join('\n');
+    })
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${xmlns}>\n${body}\n</urlset>\n`;
+}
+
+function createSitemapIndexXml(items) {
+  const body = items
+    .map(
+      (item) => `  <sitemap>\n    <loc>${escapeXml(item.loc)}</loc>\n    <lastmod>${escapeXml(
+        item.lastmod || buildTimestamp,
+      )}</lastmod>\n  </sitemap>`,
+    )
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</sitemapindex>\n`;
+}
+
+function createRobotsTxt() {
+  return `User-agent: *\nAllow: /\n\nDisallow: /admin\nDisallow: /admin/\nDisallow: /cart\nDisallow: /checkout\nDisallow: /checkout/\nDisallow: /login\nDisallow: /register\nDisallow: /profile\nDisallow: /wishlist\nDisallow: /search\nDisallow: /*?*sort=\nDisallow: /*?*utm_\nDisallow: /*?*fbclid=\nDisallow: /*?*gclid=\n\nSitemap: ${SITE_URL}/sitemap.xml\n`;
+}
 
 async function fetchJson(url) {
   const response = await fetch(url, {
@@ -98,94 +188,128 @@ async function fetchAllCollections() {
   return items;
 }
 
-function createSitemapXml(urls) {
-  const body = urls
-    .map((entry) => {
-      const parts = [
-        '  <url>',
-        `    <loc>${escapeXml(entry.loc)}</loc>`,
-      ];
+function buildEntryImages({ image, imageAlt, images = [] }) {
+  const normalized = [];
 
-      if (entry.lastmod) {
-        parts.push(`    <lastmod>${escapeXml(entry.lastmod)}</lastmod>`);
-      }
+  const pushImage = (value, caption) => {
+    const loc = normalizeImageUrl(value);
+    if (!loc) return;
+    normalized.push({
+      loc,
+      caption: normalizeImageAlt(caption),
+    });
+  };
 
-      if (entry.changefreq) {
-        parts.push(`    <changefreq>${escapeXml(entry.changefreq)}</changefreq>`);
-      }
+  pushImage(image, imageAlt);
+  images.forEach((item) => {
+    pushImage(item?.url || item?.src || item, item?.alt || item?.altText || imageAlt);
+  });
 
-      if (entry.priority) {
-        parts.push(`    <priority>${escapeXml(entry.priority)}</priority>`);
-      }
+  if (!normalized.length) {
+    pushImage(DEFAULT_SOCIAL_IMAGE, imageAlt);
+  }
 
-      parts.push('  </url>');
-      return parts.join('\n');
-    })
-    .join('\n');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
+  return uniqueImages(normalized);
 }
 
-function createRobotsTxt() {
-  return `User-agent: *\nAllow: /\n\nDisallow: /admin\nDisallow: /admin/\nDisallow: /cart\nDisallow: /checkout\nDisallow: /checkout/\nDisallow: /login\nDisallow: /register\nDisallow: /profile\nDisallow: /wishlist\nDisallow: /search\nDisallow: /*?*sort=\nDisallow: /*?*utm_\nDisallow: /*?*fbclid=\nDisallow: /*?*gclid=\n\nSitemap: ${SITE_URL}/sitemap.xml\n`;
-}
+function createPriorityForProduct(product) {
+  const updatedAt = new Date(product?.updatedAt || product?.publishedAt || 0);
+  const ageInDays = Number.isFinite(updatedAt.getTime())
+    ? Math.round((Date.now() - updatedAt.getTime()) / 86400000)
+    : Number.POSITIVE_INFINITY;
 
-function normalizeDate(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
+  return ageInDays <= 120 ? '0.8' : '0.7';
 }
 
 async function main() {
-  const urls = [];
-  const seen = new Set();
+  const pageEntries = [];
+  const imageEntries = [];
+  const seenPages = new Set();
+  const seenImages = new Set();
 
-  const register = (entry) => {
-    if (!entry?.loc || seen.has(entry.loc)) return;
-    seen.add(entry.loc);
-    urls.push(entry);
+  const registerPage = (entry) => {
+    if (!entry?.loc || seenPages.has(entry.loc)) return;
+    seenPages.add(entry.loc);
+
+    const images = buildEntryImages(entry);
+    const normalizedEntry = {
+      loc: entry.loc,
+      lastmod: normalizeDate(entry.lastmod),
+      changefreq: entry.changefreq || 'weekly',
+      priority: entry.priority || '0.5',
+      images,
+    };
+
+    pageEntries.push(normalizedEntry);
+
+    images.forEach((image) => {
+      const key = `${normalizedEntry.loc}::${image.loc}`;
+      if (seenImages.has(key)) return;
+      seenImages.add(key);
+      imageEntries.push({
+        ...normalizedEntry,
+        images: [image],
+      });
+    });
   };
 
   STATIC_ROUTES.forEach((route) => {
-    register({
+    registerPage({
       loc: toAbsoluteUrl(route.path),
+      lastmod: route.lastmod,
       changefreq: route.changefreq,
       priority: route.priority,
+      image: route.image,
+      imageAlt: route.path === '/' ? 'The House of Aradhya homepage hero' : `${route.path} page image`,
     });
   });
 
   blogArticles.forEach((article) => {
-    register({
+    registerPage({
       loc: toAbsoluteUrl(`/blog/${article.slug}`),
+      lastmod: article.updatedAt || article.publishedAt,
       changefreq: 'monthly',
       priority: '0.6',
+      image: article.coverImage,
+      imageAlt: article.coverAlt || article.title,
     });
   });
 
   try {
-    const [products, collections] = await Promise.all([
-      fetchAllProducts(),
-      fetchAllCollections(),
-    ]);
+    const [products, collections] = await Promise.all([fetchAllProducts(), fetchAllCollections()]);
 
     collections.forEach((collection) => {
       if (!collection?.handle) return;
-      register({
+      registerPage({
         loc: toAbsoluteUrl(`/collections/${collection.handle}`),
-        lastmod: normalizeDate(collection.updatedAt || collection.publishedAt),
+        lastmod: collection.updatedAt || collection.publishedAt,
         changefreq: 'weekly',
-        priority: collection.parentId ? '0.6' : '0.7',
+        priority: '0.9',
+        image:
+          collection.image?.url ||
+          collection.featuredImage?.url ||
+          collection.heroImage?.url ||
+          collection.products?.[0]?.featuredImage?.url,
+        imageAlt:
+          collection.image?.altText ||
+          collection.featuredImage?.altText ||
+          `${collection.title || collection.handle} collection image`,
       });
     });
 
     products.forEach((product) => {
       if (!product?.handle) return;
-      register({
+      registerPage({
         loc: toAbsoluteUrl(`/product/${product.handle}`),
-        lastmod: normalizeDate(product.updatedAt || product.publishedAt),
+        lastmod: product.updatedAt || product.publishedAt,
         changefreq: 'weekly',
-        priority: '0.8',
+        priority: createPriorityForProduct(product),
+        image: product.featuredImage?.url || product.image?.url,
+        imageAlt:
+          product.featuredImage?.altText ||
+          product.image?.altText ||
+          `${product.title || product.handle} product image`,
+        images: Array.isArray(product.images) ? product.images.slice(0, 10) : [],
       });
     });
   } catch (error) {
@@ -193,10 +317,33 @@ async function main() {
   }
 
   await fs.mkdir(publicDir, { recursive: true });
-  await fs.writeFile(path.join(publicDir, 'sitemap.xml'), createSitemapXml(urls), 'utf8');
+
+  const pageSitemapName = 'sitemap-pages.xml';
+  const imageSitemapName = 'sitemap-images.xml';
+
+  await fs.writeFile(
+    path.join(publicDir, pageSitemapName),
+    createUrlsetXml(pageEntries, { includeImages: true }),
+    'utf8',
+  );
+  await fs.writeFile(
+    path.join(publicDir, imageSitemapName),
+    createUrlsetXml(imageEntries, { includeImages: true }),
+    'utf8',
+  );
+  await fs.writeFile(
+    path.join(publicDir, 'sitemap.xml'),
+    createSitemapIndexXml([
+      { loc: toAbsoluteUrl(`/${pageSitemapName}`), lastmod: buildTimestamp },
+      { loc: toAbsoluteUrl(`/${imageSitemapName}`), lastmod: buildTimestamp },
+    ]),
+    'utf8',
+  );
   await fs.writeFile(path.join(publicDir, 'robots.txt'), createRobotsTxt(), 'utf8');
 
-  console.log(`[seo] Generated sitemap.xml with ${urls.length} URLs`);
+  console.log(`[seo] Generated ${pageSitemapName} with ${pageEntries.length} URLs`);
+  console.log(`[seo] Generated ${imageSitemapName} with ${imageEntries.length} image URLs`);
+  console.log('[seo] Generated sitemap.xml index');
   console.log('[seo] Generated robots.txt');
 }
 
