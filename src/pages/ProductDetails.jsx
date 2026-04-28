@@ -208,6 +208,9 @@ const ProductDetails = () => {
 
   const [images, setImages] = useState([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
@@ -347,6 +350,60 @@ const ProductDetails = () => {
     setReviewForm((prev) => ({
       ...prev,
       [field]: value,
+    }));
+  };
+
+  const handleReviewImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setReviewSubmitError('Image must be smaller than 10MB.');
+      return;
+    }
+
+    try {
+      setReviewImageUploading(true);
+      setReviewSubmitError('');
+      
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const token = getAuthToken ? getAuthToken() : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/uploads/user`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Image upload failed');
+      }
+
+      const data = await response.json();
+      if (data.url) {
+        setReviewForm(prev => ({
+          ...prev,
+          media: [...(prev.media || []), { url: data.url }]
+        }));
+      }
+    } catch (err) {
+      console.error('Image upload error:', err);
+      setReviewSubmitError(err.message || 'Unable to upload image.');
+    } finally {
+      setReviewImageUploading(false);
+      // Reset input value
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveReviewImage = (indexToRemove) => {
+    setReviewForm(prev => ({
+      ...prev,
+      media: (prev.media || []).filter((_, index) => index !== indexToRemove)
     }));
   };
 
@@ -774,6 +831,38 @@ const ProductDetails = () => {
     setActiveImageIndex((idx) =>
       images.length ? (idx - 1 + images.length) % images.length : 0,
     );
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches ? e.targetTouches[0].clientX : e.clientX);
+    setIsDragging(true);
+  };
+
+  const onTouchMove = (e) => {
+    if (!isDragging) return;
+    setTouchEnd(e.targetTouches ? e.targetTouches[0].clientX : e.clientX);
+  };
+
+  const onTouchEnd = () => {
+    setIsDragging(false);
+    if (touchStart === null || touchEnd === null) return;
+    const distance = touchStart - touchEnd;
+    if (distance > minSwipeDistance) nextImage();
+    else if (distance < -minSwipeDistance) prevImage();
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') prevImage();
+      if (e.key === 'ArrowRight') nextImage();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [images.length, activeImageIndex]);
 
   const handleAddToCart = () => {
     if (!product?.handle) return;
@@ -1339,7 +1428,16 @@ const ProductDetails = () => {
         </div>
 
         {/* Mobile Image Carousel - Auto Height for full view */}
-        <div className="relative w-full overflow-hidden min-h-[400px]">
+        <div 
+          className="relative w-full overflow-hidden min-h-[400px] touch-pan-y select-none"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onMouseDown={onTouchStart}
+          onMouseMove={onTouchMove}
+          onMouseUp={onTouchEnd}
+          onMouseLeave={onTouchEnd}
+        >
           {images.length > 0 ? (
             <img
               src={images[activeImageIndex]?.url}
@@ -1410,7 +1508,16 @@ const ProductDetails = () => {
               ))}
             </div>
 
-            <div className="flex-1 relative bg-gray-50 h-full overflow-hidden group rounded">
+            <div 
+              className="flex-1 relative bg-gray-50 h-full overflow-hidden group rounded select-none touch-pan-y"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              onMouseDown={onTouchStart}
+              onMouseMove={onTouchMove}
+              onMouseUp={onTouchEnd}
+              onMouseLeave={onTouchEnd}
+            >
               {images.length ? (
                 <img
                   src={images[activeImageIndex]?.url}

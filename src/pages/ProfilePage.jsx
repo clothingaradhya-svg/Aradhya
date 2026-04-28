@@ -273,9 +273,11 @@ const ProfilePage = () => {
         const normalizedStatus = (order.status || '').toUpperCase();
         const isDelivered = normalizedStatus === 'FULFILLED';
         const isCancelled = normalizedStatus === 'CANCELLED' || normalizedStatus === 'CANCELED';
+        const canCancel = normalizedStatus === 'PENDING' || normalizedStatus === 'PAID';
         const primaryAction = isDelivered ? 'Return' : 'Cancel';
-        const secondaryAction = isDelivered ? 'Exchange' : 'Replace';
-        const actionHref = `/cancel-refund-exchange?orderId=${encodeURIComponent(order.id)}`;
+        const primaryActionUrl = `/cancel-refund-exchange?orderId=${encodeURIComponent(order.id)}&action=${primaryAction.toLowerCase()}`;
+        const secondaryAction = isDelivered ? 'Exchange' : null;
+        const secondaryActionUrl = secondaryAction ? `/cancel-refund-exchange?orderId=${encodeURIComponent(order.id)}&action=${secondaryAction.toLowerCase()}` : null;
 
         return (
             <div key={order.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
@@ -301,8 +303,14 @@ const ProfilePage = () => {
                 <div className="py-4 space-y-3">
                     {items.slice(0, 3).map((item, idx) => (
                         <div key={`${order.id}-item-${idx}`} className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-md bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-semibold">
-                                {item.name?.slice(0, 2)?.toUpperCase() || '-'}
+                            <div className="w-12 h-12 rounded-md bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                                {item.image ? (
+                                    <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                                ) : (
+                                    <span className="text-gray-400 text-xs font-semibold">
+                                        {item.name?.slice(0, 2)?.toUpperCase() || '-'}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-gray-900 truncate">{item.name}</p>
@@ -326,17 +334,17 @@ const ProfilePage = () => {
                         >
                             View Details
                         </Link>
-                        {!isCancelled ? (
+                        {!isCancelled && (canCancel || isDelivered) ? (
                             <Link
-                                to={actionHref}
+                                to={primaryActionUrl}
                                 className="w-full rounded-full border border-gray-300 px-4 py-2 text-center text-xs font-semibold text-gray-700 transition-colors hover:border-gray-900 hover:text-gray-900 sm:flex-1"
                             >
                                 {primaryAction}
                             </Link>
                         ) : null}
-                        {!isCancelled ? (
+                        {!isCancelled && secondaryAction ? (
                             <Link
-                                to={actionHref}
+                                to={secondaryActionUrl}
                                 className="w-full rounded-full border border-gray-300 px-4 py-2 text-center text-xs font-semibold text-gray-700 transition-colors hover:border-gray-900 hover:text-gray-900 sm:flex-1"
                             >
                                 {secondaryAction}

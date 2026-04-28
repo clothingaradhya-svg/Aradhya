@@ -171,23 +171,36 @@ export default function OrderDetails() {
                   </div>
                 </div>
 
-                <div className="space-y-2 py-3">
-                  {items.slice(0, 4).map((item, index) => (
-                    <div key={`${order.id}-${index}`} className="flex items-center justify-between text-sm">
-                      <p className="min-w-0 flex-1 truncate text-gray-800">
-                        {item?.name || 'Item'} x{item?.quantity || 1}
-                      </p>
-                      <p className="font-medium text-gray-900">
-                        {formatMoney(
-                          Number(item?.price || 0) * Number(item?.quantity || 1),
-                          item?.currency || currency,
+                <div className="space-y-3 py-4 border-b border-gray-100">
+                  {items.map((item, index) => (
+                    <div key={`${order.id}-${index}`} className="flex items-center gap-3 text-sm">
+                      <div className="w-12 h-12 rounded-md bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                        {item?.image ? (
+                          <img src={item.image} alt={item?.name || 'Item'} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-gray-400 text-xs font-semibold">
+                            {(item?.name || 'I').slice(0, 2).toUpperCase()}
+                          </span>
                         )}
-                      </p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">
+                          {item?.name || 'Item'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Qty x{item?.quantity || 1}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-gray-900">
+                          {formatMoney(
+                            Number(item?.price || 0) * Number(item?.quantity || 1),
+                            item?.currency || currency,
+                          )}
+                        </p>
+                      </div>
                     </div>
                   ))}
-                  {items.length > 4 ? (
-                    <p className="text-xs text-gray-500">+{items.length - 4} more items</p>
-                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">

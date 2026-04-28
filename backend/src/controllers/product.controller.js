@@ -769,10 +769,13 @@ exports.listProducts = async (req, res, next) => {
     }
 
     if (categoryValue) {
+      const categoryValueSpaces = categoryValue.replace(/-/g, ' ');
       filters.push({
         OR: [
           { productType: { contains: categoryValue, mode: 'insensitive' } },
+          { productType: { contains: categoryValueSpaces, mode: 'insensitive' } },
           { category: { contains: categoryValue, mode: 'insensitive' } },
+          { category: { contains: categoryValueSpaces, mode: 'insensitive' } },
           {
             collections: {
               some: { collection: { handle: { equals: categoryValue, mode: 'insensitive' } } },

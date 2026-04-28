@@ -1231,7 +1231,7 @@ const AdminProductForm = () => {
                 {bundleProducts.length === 0 ? (
                   <p className="text-xs text-slate-500 italic">No bundle items selected.</p>
                 ) : (
-                  bundleProducts.map((prod) => (
+                  bundleProducts.map((prod, index) => (
                     <div
                       key={prod.handle}
                       className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950 p-2"

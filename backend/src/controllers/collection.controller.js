@@ -416,3 +416,50 @@ exports.deleteCollection = async (req, res, next) => {
     return next(error);
   }
 };
+
+
+exports.reorderProducts = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { productIds } = req.body;
+    
+    if (!Array.isArray(productIds)) {
+      return res.status(400).json({ message: 'productIds must be an array of strings' });
+    }
+
+    const prisma = await getPrisma();
+    
+    // First verify the collection exists
+    const collection = await prisma.collection.findUnique({
+      where: { id }
+    });
+    
+    if (!collection) {
+      return res.status(404).json({ message: 'Collection not found' });
+    }
+
+    // Wrap the updates in a transaction
+    await prisma.$transaction(
+      productIds.map((productId, index) => {
+        return prisma.productCollection.update({
+          where: {
+            productId_collectionId: {
+              productId,
+              collectionId: id
+            }
+          },
+          data: {
+            position: index + 1
+          }
+        });
+      })
+    );
+
+    return res.status(200).json({ message: 'Product positions updated successfully' });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ message: 'One or more products are not in this collection' });
+    }
+    return next(error);
+  }
+};

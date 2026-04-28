@@ -44,6 +44,7 @@ const uploadSingleImage = (req, res, next) => {
 };
 
 router.post('/', protect, requireRole('ADMIN'), uploadSingleImage, uploadSuccess);
+router.post('/user', protect, uploadSingleImage, uploadSuccess);
 router.delete('/:filename', protect, requireRole('ADMIN'), deleteUpload);
 
 module.exports = router;
