@@ -246,7 +246,8 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
       setPagedLoading(true);
       try {
         const { items, meta } = await fetchProductsPage({
-          limit: PAGE_SIZE, category: hasOccasionFilter ? occasionFilter : (hasExplicitSkintone ? skintoneFilter : undefined),
+          limit: PAGE_SIZE,
+          category: hasOccasionFilter ? occasionFilter : (hasExplicitSkintone ? skintoneFilter : undefined),
           page,
         });
         if (cancelled) return;

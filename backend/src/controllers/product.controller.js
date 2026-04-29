@@ -795,18 +795,29 @@ exports.listProducts = async (req, res, next) => {
 
     if (categoryValue) {
       const categoryValueSpaces = categoryValue.replace(/-/g, ' ');
+      const categoryValueDashes = categoryValue.replace(/\s+/g, '-');
       filters.push({
         OR: [
+          { title: { contains: categoryValue, mode: 'insensitive' } },
+          { title: { contains: categoryValueSpaces, mode: 'insensitive' } },
+          { descriptionHtml: { contains: categoryValue, mode: 'insensitive' } },
           { productType: { contains: categoryValue, mode: 'insensitive' } },
           { productType: { contains: categoryValueSpaces, mode: 'insensitive' } },
           { category: { contains: categoryValue, mode: 'insensitive' } },
           { category: { contains: categoryValueSpaces, mode: 'insensitive' } },
-          {
-            tags: { hasSome: [categoryValue, categoryValueSpaces] },
-          },
+          { tags: { hasSome: [categoryValue, categoryValueSpaces, categoryValueDashes] } },
           {
             collections: {
-              some: { collection: { handle: { equals: categoryValue, mode: 'insensitive' } } },
+              some: {
+                collection: {
+                  OR: [
+                    { handle: { contains: categoryValue, mode: 'insensitive' } },
+                    { handle: { contains: categoryValueSpaces, mode: 'insensitive' } },
+                    { title: { contains: categoryValue, mode: 'insensitive' } },
+                    { title: { contains: categoryValueSpaces, mode: 'insensitive' } },
+                  ],
+                },
+              },
             },
           },
         ],
