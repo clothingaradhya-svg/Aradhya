@@ -236,7 +236,7 @@ const normalizeVariants = (variants) => {
               namespace: String(field?.namespace || ''),
               key: String(field?.key || ''),
               type: String(field?.type || ''),
-              value: field?.value,
+              value: field?.value ?? null,
               description: field?.description,
             }))
             .filter((field) => field.namespace && field.key && field.type)
@@ -344,7 +344,7 @@ const normalizeProductInput = (raw = {}, { partial = false } = {}) => {
         namespace: String(field?.namespace || ''),
         key: String(field?.key || ''),
         type: String(field?.type || ''),
-        value: field?.value,
+        value: field?.value ?? null,
         description: field?.description,
         set: field?.set && METAFIELD_SETS.includes(String(field.set)) ? String(field.set) : undefined,
       }))
@@ -1017,8 +1017,9 @@ const createProductRelations = async (tx, productId, payload) => {
         for (const [index, variant] of payload.variants.entries()) {
           const imageId = variant.imageUrl ? mediaByUrl.get(variant.imageUrl) : null;
 
-          const created = await tx.productVariant.create({
-            data: {
+          let created;
+          try {
+            const data = {
               productId,
               title: buildVariantTitle(variant, optionOrder),
               position: index + 1,
@@ -1028,7 +1029,7 @@ const createProductRelations = async (tx, productId, payload) => {
               compareAtPrice: toDecimalString(variant.compareAtPrice),
               costPerItem: toDecimalString(variant.costPerItem),
               unitPrice: toDecimalString(variant.unitPrice),
-              unitPriceMeasurement: variant.unitPriceMeasurement,
+              unitPriceMeasurement: variant.unitPriceMeasurement ?? null,
               taxable: variant.taxable ?? true,
               trackInventory: variant.trackInventory ?? true,
               inventoryPolicy: variant.inventoryPolicy ?? 'DENY',
@@ -1037,10 +1038,16 @@ const createProductRelations = async (tx, productId, payload) => {
               weightUnit: variant.weightUnit ?? null,
               originCountryCode: variant.originCountryCode ?? null,
               hsCode: variant.hsCode ?? null,
-              optionValues: variant.optionValues ?? undefined,
-              imageId: imageId ?? undefined, // Explicit undefined if null/undefined
-            },
-          });
+              optionValues: variant.optionValues ?? null,
+              imageId: imageId ?? null,
+            };
+            console.log('[createProductRelations] Creating variant with data:', JSON.stringify(data, null, 2));
+            created = await tx.productVariant.create({ data });
+          } catch (error) {
+            console.error('[createProductRelations] Variant creation failed for variant:', JSON.stringify(variant, null, 2));
+            console.error('[createProductRelations] Prisma error details:', error);
+            throw error;
+          }
 
           if (variant.inventory?.available !== undefined && variant.trackInventory !== false) {
             const locationName = variant.inventory.location || 'Default';
