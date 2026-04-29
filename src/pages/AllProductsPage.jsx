@@ -360,7 +360,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
     [filteredProducts, sortBy],
   );
 
-  const shouldGroupBySkintone = hasOccasionFilter && !hasSkintoneFilter && activeCategory === 'all';
+  const shouldGroupBySkintone = false;
   const groupedProducts = useMemo(() => {
     if (!shouldGroupBySkintone) return [];
     return SKINTONE_GROUPS.map((group) => {
