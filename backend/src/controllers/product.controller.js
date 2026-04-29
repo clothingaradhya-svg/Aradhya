@@ -777,6 +777,9 @@ exports.listProducts = async (req, res, next) => {
           { category: { contains: categoryValue, mode: 'insensitive' } },
           { category: { contains: categoryValueSpaces, mode: 'insensitive' } },
           {
+            tags: { hasSome: [categoryValue, categoryValueSpaces] },
+          },
+          {
             collections: {
               some: { collection: { handle: { equals: categoryValue, mode: 'insensitive' } } },
             },

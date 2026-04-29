@@ -236,7 +236,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
     setPage(1);
     setHasMore(true);
     setCatalogTotal(null);
-  }, [activeCategory, isAllMode]);
+  }, [activeCategory, isAllMode, occasionFilter, skintoneFilter]);
 
   useEffect(() => {
     if (!isAllMode) return;
@@ -246,7 +246,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
       setPagedLoading(true);
       try {
         const { items, meta } = await fetchProductsPage({
-          limit: PAGE_SIZE,
+          limit: PAGE_SIZE, category: hasOccasionFilter ? occasionFilter : (hasExplicitSkintone ? skintoneFilter : undefined),
           page,
         });
         if (cancelled) return;
@@ -277,7 +277,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
     return () => {
       cancelled = true;
     };
-  }, [isAllMode, page]);
+  }, [isAllMode, page, occasionFilter, skintoneFilter]);
 
   // Load products based on category (collection handle)
   useEffect(() => {
