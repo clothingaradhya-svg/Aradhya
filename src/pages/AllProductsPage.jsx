@@ -55,13 +55,21 @@ const productMatchesFilter = (product, filterToken) => {
   const tags = Array.isArray(product?.tags) ? product.tags : [];
   const collections = Array.isArray(product?.collections) ? product.collections : [];
   const candidates = [
+    product?.title,
     product?.productType,
+    product?.category,
     ...tags,
     ...collections.map((collection) => collection?.handle),
     ...collections.map((collection) => collection?.title),
   ].filter(Boolean);
 
   if (candidates.some((candidate) => matchesToken(candidate, targetTokens))) return true;
+
+  // Also check if any candidate CONTAINS the target token as a substring
+  if (targetTokens.length === 1) {
+    const target = targetTokens[0];
+    if (candidates.some((candidate) => String(candidate).toLowerCase().includes(target))) return true;
+  }
 
   if (targetTokens.length > 1) {
     const candidateTokens = uniqueTokens(candidates.flatMap((candidate) => tokenize(candidate)));
@@ -245,15 +253,27 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
     async function loadPage() {
       setPagedLoading(true);
       try {
-        const { items, meta } = await fetchProductsPage({
-          limit: PAGE_SIZE,
-          category: hasOccasionFilter ? occasionFilter : (hasExplicitSkintone ? skintoneFilter : undefined),
-          page,
-        });
+        // When an occasion filter is active, load all products without a backend
+        // category filter — occasion matching is done client-side via tags/collections.
+        // When a skintone filter is active (but no occasion), use it as a category hint.
+        const fetchParams = {
+          page: hasOccasionFilter ? 1 : page,
+          limit: hasOccasionFilter ? 200 : PAGE_SIZE,
+          category: hasOccasionFilter
+            ? undefined
+            : (hasExplicitSkintone ? skintoneFilter : undefined),
+        };
+        const { items, meta } = await fetchProductsPage(fetchParams);
         if (cancelled) return;
         setPagedProducts((prev) => {
-          const merged = mergeUniqueProducts(prev, items);
-          if (meta?.total != null) {
+          // When loading for an occasion filter, replace instead of append
+          const base = hasOccasionFilter ? [] : prev;
+          const merged = mergeUniqueProducts(base, items);
+          if (hasOccasionFilter) {
+            // All results fetched at once; disable "load more"
+            setHasMore(false);
+            setCatalogTotal(merged.length);
+          } else if (meta?.total != null) {
             setCatalogTotal(meta.total);
             setHasMore(merged.length < meta.total);
           } else {
@@ -278,7 +298,7 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
     return () => {
       cancelled = true;
     };
-  }, [isAllMode, page, occasionFilter, skintoneFilter]);
+  }, [isAllMode, page, occasionFilter, skintoneFilter, hasOccasionFilter, hasExplicitSkintone]);
 
   // Load products based on category (collection handle)
   useEffect(() => {
@@ -328,15 +348,17 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
     if (!(applySkintone || applyOccasion)) return products;
 
     if (useFlowRuleFiltering) {
-      return products.filter((product) =>
+      const flowFiltered = products.filter((product) =>
         productMatchesStorefrontFlow(product, {
           skintone: applySkintone ? selectedSkintoneKey : '',
           occasion: applyOccasion ? selectedOccasionKey : '',
         }),
       );
+      // If flow-rule filtering returned something, use it; otherwise fall back to token matching
+      if (flowFiltered.length > 0) return flowFiltered;
     }
 
-    return products.filter((product) => {
+    const tokenFiltered = products.filter((product) => {
       const matchesSkintone = applySkintone
         ? skintoneTokens.some((token) => productMatchesFilter(product, token))
         : true;
@@ -345,6 +367,14 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
         : true;
       return matchesSkintone && matchesOccasion;
     });
+
+    // Fallback: if after filtering we still get nothing and occasion filter is active,
+    // return all products so the page isn't empty
+    if (tokenFiltered.length === 0 && applyOccasion && !applySkintone) {
+      return products;
+    }
+
+    return tokenFiltered;
   }, [
     products,
     hasExplicitSkintone,
