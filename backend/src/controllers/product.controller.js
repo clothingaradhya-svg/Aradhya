@@ -1042,7 +1042,10 @@ const createProductRelations = async (tx, productId, payload) => {
               imageId: imageId ?? null,
             };
             console.log('[createProductRelations] Creating variant with data:', JSON.stringify(data, null, 2));
-            created = await tx.productVariant.create({ data });
+            created = await tx.productVariant.create({ 
+              data,
+              select: { id: true }
+            });
           } catch (error) {
             console.error('[createProductRelations] Variant creation failed for variant:', JSON.stringify(variant, null, 2));
             console.error('[createProductRelations] Prisma error details:', error);
