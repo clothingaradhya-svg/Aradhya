@@ -664,14 +664,6 @@ const AllProductsPage = ({ initialCategory = 'all' }) => {
 
       {/* Product Grid */}
       <div className="site-shell py-6 lg:py-8 mb-20 md:mb-0">
-        <section className="mb-6 rounded-3xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-950">
-            Men&apos;s styling picks by category, skin tone, and occasion
-          </h2>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-gray-600">
-            {seoDescription}
-          </p>
-        </section>
 
         {loading ? (
           <div className="flex justify-center py-20 text-gray-500">Loading products...</div>
