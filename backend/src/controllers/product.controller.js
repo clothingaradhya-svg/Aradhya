@@ -360,6 +360,35 @@ const parseProductInput = (raw, { partial = false } = {}) => {
   return schema.parse(normalized);
 };
 
+const variantSafeSelect = {
+  id: true,
+  productId: true,
+  title: true,
+  position: true,
+  sku: true,
+  barcode: true,
+  price: true,
+  compareAtPrice: true,
+  costPerItem: true,
+  unitPrice: true,
+  unitPriceMeasurement: true,
+  taxable: true,
+  trackInventory: true,
+  inventoryPolicy: true,
+  requiresShipping: true,
+  weight: true,
+  weightUnit: true,
+  originCountryCode: true,
+  hsCode: true,
+  optionValues: true,
+  imageId: true,
+  createdAt: true,
+  updatedAt: true,
+  inventoryLevels: { include: { location: true } },
+  image: true,
+  metafields: true,
+};
+
 const productInclude = {
   collections: {
     include: { collection: true },
@@ -368,11 +397,7 @@ const productInclude = {
   media: true,
   options: true,
   variants: {
-    include: {
-      inventoryLevels: { include: { location: true } },
-      image: true,
-      metafields: true,
-    },
+    select: variantSafeSelect,
     orderBy: { position: 'asc' },
   },
   metafields: true,
