@@ -1004,6 +1004,13 @@ export const adminCreateShiprocketShipment = async (token, orderId) =>
     }),
   );
 
+export const adminCreateShiprocketOrder = async (token, orderId) =>
+  unwrap(
+    await requestWithAuth(`/orders/${encodeURIComponent(orderId)}/shiprocket/order`, token, {
+      method: 'POST',
+    }),
+  );
+
 export const adminRefreshShiprocketTracking = async (token, orderId) =>
   unwrap(
     await requestWithAuth(`/orders/${encodeURIComponent(orderId)}/shiprocket/track`, token, {

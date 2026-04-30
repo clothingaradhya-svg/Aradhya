@@ -16,6 +16,12 @@ router.get("/requests/my", protect, orderController.listMyOrderRequests);
 router.get("/my", protect, orderController.getMyOrders);
 router.get("/", protect, requireRole("ADMIN"), orderController.listOrders);
 router.post(
+  "/:id/shiprocket/order",
+  protect,
+  requireRole("ADMIN"),
+  orderController.createShiprocketOrder,
+);
+router.post(
   "/:id/shiprocket",
   protect,
   requireRole("ADMIN"),

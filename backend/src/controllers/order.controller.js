@@ -988,6 +988,71 @@ exports.createShiprocketShipment = async (req, res, next) => {
   }
 };
 
+exports.createShiprocketOrder = async (req, res, next) => {
+  try {
+    const prisma = await getPrisma();
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!order) {
+      return sendError(res, 404, "Order not found");
+    }
+
+    const result = await orderShippingService.ensureShiprocketOrderForOrder(order);
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        shipping: result.shippingPatch,
+      },
+    });
+
+    return sendSuccess(
+      res,
+      {
+        order: sanitizeOrder(updated),
+        shipment: result.shipment || null,
+        alreadyExists: Boolean(result.alreadyExists),
+      },
+      null,
+      result.alreadyExists
+        ? "Shiprocket order already exists."
+        : "Shiprocket order created successfully.",
+    );
+  } catch (error) {
+    const provisioningError = formatProvisioningError(error);
+    try {
+      const prisma = await getPrisma();
+      const existing = await prisma.order.findUnique({
+        where: { id: req.params.id },
+      });
+      if (existing) {
+        await prisma.order.update({
+          where: { id: existing.id },
+          data: {
+            shipping: {
+              ...(existing.shipping || {}),
+              ...(error?.shippingPatch && typeof error.shippingPatch === "object"
+                ? error.shippingPatch
+                : {}),
+              shiprocketStatus: "Order Sync Failed",
+              shiprocketProvisioningError: provisioningError,
+              shiprocketLastSyncedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
+    } catch {
+      // Keep the original Shiprocket error as the response.
+    }
+
+    if (error?.status) {
+      return sendError(res, error.status, provisioningError || "Unable to create Shiprocket order.");
+    }
+    return next(error);
+  }
+};
+
 exports.createCheckoutOrder = async (req, res, next) => {
   try {
     const payload = createCheckoutOrderSchema.parse(req.body || {});

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  adminCreateShiprocketOrder,
   adminCreateShiprocketShipment,
   adminFetchOrders,
   adminRefreshShiprocketTracking,
@@ -238,6 +239,27 @@ const AdminOrders = () => {
       toast.error('Save Failed', err?.message || 'Unable to save tracking info.');
     } finally {
       setSavingTrackingOrderId('');
+    }
+  };
+
+  const createShiprocketOrder = async (order) => {
+    if (!token || !order?.id) return;
+    setShiprocketActionOrderId(order.id);
+    try {
+      const payload = await adminCreateShiprocketOrder(token, order.id);
+      const wasExisting = Boolean(payload?.alreadyExists);
+      toast.success(
+        wasExisting ? 'Shiprocket Order Exists' : 'Shiprocket Order Created',
+        wasExisting
+          ? 'This order already has a Shiprocket order ID.'
+          : 'Shiprocket order created. You can create shipment after it is synced.',
+      );
+      await loadOrders();
+    } catch (err) {
+      toast.error('Shiprocket Order Failed', err?.message || 'Unable to create Shiprocket order.');
+      await loadOrders();
+    } finally {
+      setShiprocketActionOrderId('');
     }
   };
 
@@ -518,6 +540,16 @@ const AdminOrders = () => {
                                 </div>
 
                                 <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                                  {!shiprocketOrderId ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => createShiprocketOrder(order)}
+                                      disabled={isShiprocketWorking}
+                                      className="rounded-lg border border-violet-500/40 px-3 py-2 text-xs font-semibold text-violet-300 hover:bg-violet-500/10 disabled:opacity-60"
+                                    >
+                                      {isShiprocketWorking ? 'Working...' : 'Create Shiprocket Order'}
+                                    </button>
+                                  ) : null}
                                   {canCreateShiprocketShipment ? (
                                     <button
                                       type="button"
