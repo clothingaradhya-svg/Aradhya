@@ -1108,6 +1108,24 @@ exports.createShiprocketOrder = async (req, res, next) => {
   }
 };
 
+exports.logCheckoutDebug = async (req, res) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  console.info("[Checkout Debug]", {
+    stage: body.stage || "unknown",
+    paymentMethod: body.paymentMethod || null,
+    isAuthenticated: Boolean(body.isAuthenticated),
+    hasToken: Boolean(body.hasToken),
+    hasDraft: Boolean(body.hasDraft),
+    itemCount: Number(body.itemCount || 0),
+    total: body.total ?? null,
+    details: body.details || null,
+    url: body.url || null,
+    userAgent: req.get("user-agent") || null,
+  });
+
+  return sendSuccess(res, { ok: true });
+};
+
 exports.createCheckoutOrder = async (req, res, next) => {
   try {
     const payload = createCheckoutOrderSchema.parse(req.body || {});

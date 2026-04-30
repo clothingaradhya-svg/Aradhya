@@ -111,9 +111,10 @@ const inflightRequests = new Map();
 const responseCache = new Map();
 const RESPONSE_CACHE_TTL = 60_000;
 
-const request = async (path, { method = 'GET', headers = {}, body } = {}) => {
+const request = async (path, { method = 'GET', headers = {}, body, keepalive = false } = {}) => {
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
   const options = { method, headers: { ...headers } };
+  if (keepalive) options.keepalive = true;
 
   if (body !== undefined) {
     if (body instanceof FormData) {
@@ -877,6 +878,15 @@ export const createCheckoutOrder = async (token, data) =>
     await requestWithAuth('/create-order', token, {
       method: 'POST',
       body: data,
+    }),
+  );
+
+export const logCheckoutDebug = async (data) =>
+  unwrap(
+    await request('/checkout-debug', {
+      method: 'POST',
+      body: data,
+      keepalive: true,
     }),
   );
 

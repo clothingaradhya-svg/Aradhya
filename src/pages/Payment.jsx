@@ -12,6 +12,7 @@ import {
   createCheckoutOrder,
   createRazorpayOrder,
   formatMoney,
+  logCheckoutDebug,
   verifyDiscountCode,
 } from '../lib/api';
 import { useAuth } from '../contexts/auth-context';
@@ -303,20 +304,44 @@ export default function Payment() {
       : null,
   });
 
+  const sendCheckoutDebug = (stage, details = null) => {
+    logCheckoutDebug({
+      stage,
+      paymentMethod: selectedPayment,
+      isAuthenticated,
+      hasToken: Boolean(typeof getAuthToken === 'function' ? getAuthToken() : null),
+      hasDraft: Boolean(draft),
+      itemCount,
+      total: finalTotal,
+      details,
+      url: typeof window !== 'undefined' ? window.location.href : null,
+    }).catch(() => {
+      // Debug logging should never interrupt checkout.
+    });
+  };
+
   const handlePlaceOrder = async () => {
+    sendCheckoutDebug('place_order_clicked');
+
     if (!draft?.items?.length || placingOrder) {
+      sendCheckoutDebug('blocked_missing_items_or_already_placing', {
+        hasItems: Boolean(draft?.items?.length),
+        placingOrder,
+      });
       setError('Please select items to checkout.');
       return;
     }
     setError('');
 
     if (!isAuthenticated) {
+      sendCheckoutDebug('blocked_not_authenticated');
       navigate(appendMetaDebugParams('/login?redirect=/checkout/payment'));
       return;
     }
 
     const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
     if (!token) {
+      sendCheckoutDebug('blocked_missing_token');
       setError('Session expired. Please log in again.');
       navigate(appendMetaDebugParams('/login?redirect=/checkout/payment'));
       return;
@@ -329,11 +354,19 @@ export default function Payment() {
       !draft.shipping?.state ||
       !draft.shipping?.postalCode
     ) {
+      sendCheckoutDebug('blocked_incomplete_shipping', {
+        hasFullName: Boolean(draft.shipping?.fullName),
+        hasAddress: Boolean(draft.shipping?.address),
+        hasCity: Boolean(draft.shipping?.city),
+        hasState: Boolean(draft.shipping?.state),
+        hasPostalCode: Boolean(draft.shipping?.postalCode),
+      });
       setError('Shipping address is incomplete. Please go back and complete your address.');
       return;
     }
 
     if (finalTotal <= 0) {
+      sendCheckoutDebug('blocked_invalid_total');
       setError('Order total is invalid. Please refresh and try again.');
       return;
     }
@@ -343,11 +376,19 @@ export default function Payment() {
     if (selectedPayment === 'COD') {
       try {
         setPlacingOrder(true);
+        sendCheckoutDebug('calling_create_order_cod');
         const order = await createCheckoutOrder(token, {
           order: orderPayload,
         });
+        sendCheckoutDebug('create_order_cod_success', {
+          orderNumber: order?.number || null,
+        });
         await finalizeOrderSuccess(order);
       } catch (err) {
+        sendCheckoutDebug('create_order_cod_error', {
+          message: err?.message || null,
+          status: err?.status || null,
+        });
         setError(err?.message || 'Unable to place this COD order right now.');
       } finally {
         setPlacingOrder(false);
@@ -357,13 +398,19 @@ export default function Payment() {
 
     try {
       setPlacingOrder(true);
+      sendCheckoutDebug('loading_razorpay_script');
       const razorpayLoaded = await loadRazorpayScript();
       if (!razorpayLoaded || !window.Razorpay) {
+        sendCheckoutDebug('razorpay_script_failed');
         throw new Error('Razorpay checkout could not be loaded. Please try again.');
       }
 
+      sendCheckoutDebug('calling_razorpay_order');
       const razorpaySession = await createRazorpayOrder(token, {
         order: orderPayload,
+      });
+      sendCheckoutDebug('razorpay_order_success', {
+        razorpayOrderId: razorpaySession?.order?.id || null,
       });
 
       await new Promise((resolve, reject) => {
@@ -390,6 +437,9 @@ export default function Payment() {
           },
           handler: async (response) => {
             try {
+              sendCheckoutDebug('razorpay_handler_calling_create_order', {
+                razorpayOrderId: response.razorpay_order_id || null,
+              });
               const order = await createCheckoutOrder(token, {
                 order: orderPayload,
                 payment: {
@@ -398,20 +448,35 @@ export default function Payment() {
                   razorpaySignature: response.razorpay_signature,
                 },
               });
+              sendCheckoutDebug('create_order_prepaid_success', {
+                orderNumber: order?.number || null,
+              });
               await finalizeOrderSuccess(order);
               resolve();
             } catch (err) {
+              sendCheckoutDebug('create_order_prepaid_error', {
+                message: err?.message || null,
+                status: err?.status || null,
+              });
               reject(err);
             }
           },
           modal: {
-            ondismiss: () => reject(new Error('Payment was cancelled.')),
+            ondismiss: () => {
+              sendCheckoutDebug('razorpay_modal_dismissed');
+              reject(new Error('Payment was cancelled.'));
+            },
           },
         });
 
+        sendCheckoutDebug('opening_razorpay_modal');
         razorpay.open();
       });
     } catch (err) {
+      sendCheckoutDebug('prepaid_checkout_error', {
+        message: err?.message || null,
+        status: err?.status || null,
+      });
       setError(err?.message || 'Unable to continue to Razorpay right now.');
     } finally {
       setPlacingOrder(false);
