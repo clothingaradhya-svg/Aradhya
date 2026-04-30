@@ -400,14 +400,50 @@ const formatProvisioningError = (error) => {
   }
 };
 
+const logOrderCreationEvent = (label, payload = {}) => {
+  console.info(`[Order Creation] ${label}`, payload);
+};
+
+const envSafeStack = (error) =>
+  process.env.NODE_ENV === "production" ? undefined : error?.stack || undefined;
+
+const buildShiprocketErrorLog = (error) => ({
+  status: error?.status || null,
+  message: error?.message || null,
+  details: error?.details || null,
+  shippingPatch: error?.shippingPatch || null,
+  stack: envSafeStack(error),
+});
+
 const tryProvisionShiprocketShipment = async (prisma, order) => {
   if (!orderShippingService.shouldCreateShipmentForOrder(order)) {
+    logOrderCreationEvent("Shiprocket provisioning skipped", {
+      orderId: order?.id || null,
+      orderNumber: order?.number || null,
+      status: order?.status || null,
+      paymentMethod: order?.paymentMethod || null,
+    });
     return order;
   }
 
   try {
+    logOrderCreationEvent("Shiprocket provisioning started", {
+      orderId: order?.id || null,
+      orderNumber: order?.number || null,
+      status: order?.status || null,
+      paymentMethod: order?.paymentMethod || null,
+    });
     const result = await orderShippingService.ensureShiprocketOrderForOrder(order);
     if (!result?.shippingPatch) return order;
+
+    logOrderCreationEvent("Shiprocket provisioning completed", {
+      orderId: order?.id || null,
+      orderNumber: order?.number || null,
+      shiprocketOrderId: result?.shipment?.summary?.shiprocketOrderId || null,
+      shipmentId: result?.shipment?.summary?.shipmentId || null,
+      awbCode: result?.shipment?.summary?.awbCode || null,
+      alreadyExists: Boolean(result?.alreadyExists),
+    });
 
     return prisma.order.update({
       where: { id: order.id },
@@ -419,7 +455,10 @@ const tryProvisionShiprocketShipment = async (prisma, order) => {
     const provisioningError = formatProvisioningError(error);
     console.error(
       `[Shiprocket] Unable to provision shipment for order ${order?.number || order?.id}:`,
-      provisioningError,
+      {
+        provisioningError,
+        ...buildShiprocketErrorLog(error),
+      },
     );
     try {
       return await prisma.order.update({
@@ -480,6 +519,14 @@ const trySendMetaPurchaseEvent = async (prisma, order) => {
 exports.createOrder = async (req, res, next) => {
   try {
     const payload = createOrderSchema.parse(req.body);
+    logOrderCreationEvent("POST /api/orders received", {
+      userId: req.user?.id || null,
+      paymentMethod: payload.paymentMethod || null,
+      itemCount: Array.isArray(payload.items) ? payload.items.length : 0,
+      total: payload?.totals?.total ?? null,
+      currency: payload?.totals?.currency || null,
+    });
+
     const prisma = await getPrisma();
     const canonicalTotals = await calculateCanonicalTotals(prisma, payload);
     const normalizedMethod = isCodPaymentMethod(payload.paymentMethod) ? "COD" : normalizePaymentMethod(payload.paymentMethod);
@@ -500,6 +547,14 @@ exports.createOrder = async (req, res, next) => {
         items: payload.items,
         userId: req.user?.id,
       },
+    });
+
+    logOrderCreationEvent("Order row created from /api/orders", {
+      orderId: order.id,
+      orderNumber: order.number,
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      total: order?.totals?.total ?? null,
     });
 
     const orderWithShipment = await tryProvisionShiprocketShipment(prisma, order);
@@ -1058,6 +1113,14 @@ exports.createCheckoutOrder = async (req, res, next) => {
     const payload = createCheckoutOrderSchema.parse(req.body || {});
     const orderInput = payload.order;
     const normalizedMethod = normalizePaymentMethod(orderInput.paymentMethod || "PREPAID");
+    logOrderCreationEvent("POST /api/create-order received", {
+      userId: req.user?.id || null,
+      paymentMethod: normalizedMethod,
+      hasPayment: Boolean(payload.payment),
+      itemCount: Array.isArray(orderInput.items) ? orderInput.items.length : 0,
+      total: orderInput?.totals?.total ?? null,
+      currency: orderInput?.totals?.currency || null,
+    });
 
     if (normalizedMethod !== "COD") {
       const creds = razorpayService.getRazorpayCreds();
@@ -1104,6 +1167,14 @@ exports.createCheckoutOrder = async (req, res, next) => {
         items: orderInput.items,
         userId: req.user?.id,
       },
+    });
+
+    logOrderCreationEvent("Order row created from /api/create-order", {
+      orderId: created.id,
+      orderNumber: created.number,
+      status: created.status,
+      paymentMethod: created.paymentMethod,
+      total: created?.totals?.total ?? null,
     });
 
     const orderWithShipment = await tryProvisionShiprocketShipment(prisma, created);
