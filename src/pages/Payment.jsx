@@ -304,8 +304,9 @@ export default function Payment() {
       : null,
   });
 
-  const sendCheckoutDebug = (stage, details = null) => {
-    logCheckoutDebug({
+  const sendCheckoutDebug = async (stage, details = null) => {
+    try {
+      await logCheckoutDebug({
       stage,
       paymentMethod: selectedPayment,
       isAuthenticated,
@@ -315,16 +316,17 @@ export default function Payment() {
       total: finalTotal,
       details,
       url: typeof window !== 'undefined' ? window.location.href : null,
-    }).catch(() => {
+      });
+    } catch {
       // Debug logging should never interrupt checkout.
-    });
+    }
   };
 
   const handlePlaceOrder = async () => {
-    sendCheckoutDebug('place_order_clicked');
+    await sendCheckoutDebug('place_order_clicked');
 
     if (!draft?.items?.length || placingOrder) {
-      sendCheckoutDebug('blocked_missing_items_or_already_placing', {
+      await sendCheckoutDebug('blocked_missing_items_or_already_placing', {
         hasItems: Boolean(draft?.items?.length),
         placingOrder,
       });
@@ -334,14 +336,14 @@ export default function Payment() {
     setError('');
 
     if (!isAuthenticated) {
-      sendCheckoutDebug('blocked_not_authenticated');
+      await sendCheckoutDebug('blocked_not_authenticated');
       navigate(appendMetaDebugParams('/login?redirect=/checkout/payment'));
       return;
     }
 
     const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
     if (!token) {
-      sendCheckoutDebug('blocked_missing_token');
+      await sendCheckoutDebug('blocked_missing_token');
       setError('Session expired. Please log in again.');
       navigate(appendMetaDebugParams('/login?redirect=/checkout/payment'));
       return;
@@ -354,7 +356,7 @@ export default function Payment() {
       !draft.shipping?.state ||
       !draft.shipping?.postalCode
     ) {
-      sendCheckoutDebug('blocked_incomplete_shipping', {
+      await sendCheckoutDebug('blocked_incomplete_shipping', {
         hasFullName: Boolean(draft.shipping?.fullName),
         hasAddress: Boolean(draft.shipping?.address),
         hasCity: Boolean(draft.shipping?.city),
@@ -366,7 +368,7 @@ export default function Payment() {
     }
 
     if (finalTotal <= 0) {
-      sendCheckoutDebug('blocked_invalid_total');
+      await sendCheckoutDebug('blocked_invalid_total');
       setError('Order total is invalid. Please refresh and try again.');
       return;
     }
@@ -376,16 +378,16 @@ export default function Payment() {
     if (selectedPayment === 'COD') {
       try {
         setPlacingOrder(true);
-        sendCheckoutDebug('calling_create_order_cod');
+        await sendCheckoutDebug('calling_create_order_cod');
         const order = await createCheckoutOrder(token, {
           order: orderPayload,
         });
-        sendCheckoutDebug('create_order_cod_success', {
+        await sendCheckoutDebug('create_order_cod_success', {
           orderNumber: order?.number || null,
         });
         await finalizeOrderSuccess(order);
       } catch (err) {
-        sendCheckoutDebug('create_order_cod_error', {
+        await sendCheckoutDebug('create_order_cod_error', {
           message: err?.message || null,
           status: err?.status || null,
         });
@@ -398,18 +400,18 @@ export default function Payment() {
 
     try {
       setPlacingOrder(true);
-      sendCheckoutDebug('loading_razorpay_script');
+      await sendCheckoutDebug('loading_razorpay_script');
       const razorpayLoaded = await loadRazorpayScript();
       if (!razorpayLoaded || !window.Razorpay) {
-        sendCheckoutDebug('razorpay_script_failed');
+        await sendCheckoutDebug('razorpay_script_failed');
         throw new Error('Razorpay checkout could not be loaded. Please try again.');
       }
 
-      sendCheckoutDebug('calling_razorpay_order');
+      await sendCheckoutDebug('calling_razorpay_order');
       const razorpaySession = await createRazorpayOrder(token, {
         order: orderPayload,
       });
-      sendCheckoutDebug('razorpay_order_success', {
+      await sendCheckoutDebug('razorpay_order_success', {
         razorpayOrderId: razorpaySession?.order?.id || null,
       });
 
@@ -437,7 +439,7 @@ export default function Payment() {
           },
           handler: async (response) => {
             try {
-              sendCheckoutDebug('razorpay_handler_calling_create_order', {
+              await sendCheckoutDebug('razorpay_handler_calling_create_order', {
                 razorpayOrderId: response.razorpay_order_id || null,
               });
               const order = await createCheckoutOrder(token, {
@@ -448,13 +450,13 @@ export default function Payment() {
                   razorpaySignature: response.razorpay_signature,
                 },
               });
-              sendCheckoutDebug('create_order_prepaid_success', {
+              await sendCheckoutDebug('create_order_prepaid_success', {
                 orderNumber: order?.number || null,
               });
               await finalizeOrderSuccess(order);
               resolve();
             } catch (err) {
-              sendCheckoutDebug('create_order_prepaid_error', {
+              await sendCheckoutDebug('create_order_prepaid_error', {
                 message: err?.message || null,
                 status: err?.status || null,
               });
@@ -463,17 +465,17 @@ export default function Payment() {
           },
           modal: {
             ondismiss: () => {
-              sendCheckoutDebug('razorpay_modal_dismissed');
+              void sendCheckoutDebug('razorpay_modal_dismissed');
               reject(new Error('Payment was cancelled.'));
             },
           },
         });
 
-        sendCheckoutDebug('opening_razorpay_modal');
+        void sendCheckoutDebug('opening_razorpay_modal');
         razorpay.open();
       });
     } catch (err) {
-      sendCheckoutDebug('prepaid_checkout_error', {
+      await sendCheckoutDebug('prepaid_checkout_error', {
         message: err?.message || null,
         status: err?.status || null,
       });
