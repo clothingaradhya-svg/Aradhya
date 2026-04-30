@@ -30,6 +30,22 @@ const createAppError = (message, status = 500, details = null) => {
   return error;
 };
 
+const logShiprocket = (label, details) => {
+  if (details === undefined) {
+    console.info(`[Shiprocket] ${label}`);
+    return;
+  }
+  console.info(`[Shiprocket] ${label}`, details);
+};
+
+const logShiprocketError = (label, details) => {
+  if (details === undefined) {
+    console.error(`[Shiprocket] ${label}`);
+    return;
+  }
+  console.error(`[Shiprocket] ${label}`, details);
+};
+
 const compactObject = (value = {}) =>
   Object.fromEntries(
     Object.entries(value).filter(
@@ -51,10 +67,42 @@ const hasCredentialPair = () =>
 
 const ensureShiprocketCredentials = () => {
   if (hasStaticToken() || hasCredentialPair()) return;
+  logShiprocketError("Missing credentials", {
+    hasEmail: Boolean(String(env.shiprocketEmail || "").trim()),
+    hasPassword: Boolean(String(env.shiprocketPassword || "").trim()),
+    hasToken: false,
+  });
   throw createAppError(
-    "Shiprocket credentials are missing. Add SHIPROCKET_TOKEN or SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD in backend/.env.",
+    "Shiprocket credentials are missing. Add SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD in Vercel production env vars, or provide SHIPROCKET_TOKEN as a fallback.",
     500,
   );
+};
+
+const validateRequiredConfig = () => {
+  ensureShiprocketCredentials();
+
+  const pickupLocation = String(env.shiprocketPickupLocation || "").trim();
+  const pickupPincode = String(env.shiprocketPickupPincode || "").trim();
+
+  if (!pickupLocation) {
+    logShiprocketError("Invalid pickup location", {
+      SHIPROCKET_PICKUP_LOCATION: pickupLocation,
+    });
+    throw createAppError(
+      "Shiprocket pickup location is missing. Set SHIPROCKET_PICKUP_LOCATION in Vercel production env vars.",
+      500,
+    );
+  }
+
+  if (!/^\d{6}$/.test(pickupPincode)) {
+    logShiprocketError("Invalid pickup pincode", {
+      SHIPROCKET_PICKUP_PINCODE: pickupPincode || null,
+    });
+    throw createAppError(
+      "Shiprocket pickup pincode is invalid. Set SHIPROCKET_PICKUP_PINCODE to a valid 6-digit pincode in Vercel production env vars.",
+      500,
+    );
+  }
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -139,13 +187,38 @@ const mapShiprocketError = (error, fallbackMessage = "Shiprocket request failed.
   if (statusCode === 404) mappedStatus = 404;
   if (statusCode === 408) mappedStatus = 504;
 
+  if (statusCode === 400 || statusCode === 422) {
+    logShiprocketError("API validation error", {
+      statusCode,
+      message,
+      details,
+    });
+  }
+
+  if (isPickupLocationError({ message, details })) {
+    logShiprocketError("Invalid pickup location", {
+      pickupLocation: env.shiprocketPickupLocation || null,
+      message,
+      details,
+    });
+  }
+
   return createAppError(message, mappedStatus, details);
 };
 
 const authenticate = async ({ forceRefresh = false } = {}) => {
   ensureShiprocketCredentials();
 
-  if (hasStaticToken()) {
+  if (hasCredentialPair()) {
+    if (!forceRefresh && hasFreshToken() && tokenCache.source === "login") {
+      return {
+        token: tokenCache.token,
+        expiresAt: tokenCache.expiresAt,
+        refreshedAt: tokenCache.refreshedAt,
+        source: tokenCache.source,
+      };
+    }
+  } else if (hasStaticToken()) {
     const configuredToken = String(env.shiprocketToken || "").trim();
     const configuredExpiry = decodeJwtExpiry(configuredToken);
     const staticTokenExpired =
@@ -167,11 +240,14 @@ const authenticate = async ({ forceRefresh = false } = {}) => {
     }
 
     if (!hasCredentialPair()) {
+      if (staticTokenExpired) {
+        logShiprocketError("Static token appears expired and no email/password fallback is configured");
+      }
       return hydrateTokenCache(configuredToken, "static-token");
     }
   }
 
-  if (!forceRefresh && hasFreshToken()) {
+  if (!forceRefresh && hasFreshToken() && (!hasCredentialPair() || tokenCache.source === "login")) {
     return {
       token: tokenCache.token,
       expiresAt: tokenCache.expiresAt,
@@ -206,6 +282,9 @@ const authenticate = async ({ forceRefresh = false } = {}) => {
       }
 
       hydrateTokenCache(token, "login");
+      logShiprocket("Authenticated with email/password", {
+        expiresAt: tokenCache.expiresAt,
+      });
 
       return tokenCache;
     })
@@ -608,6 +687,7 @@ const getAuthStatus = async () => {
 };
 
 const createOrder = async (input) => {
+  validateRequiredConfig();
   const payload = buildCreateOrderPayload(input);
   try {
     return await createOrderRequest(payload);
@@ -714,6 +794,7 @@ const generateManifest = async ({ shipmentId }) => {
 };
 
 module.exports = {
+  validateRequiredConfig,
   getAuthStatus,
   createOrder,
   searchOrders,

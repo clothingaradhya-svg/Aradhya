@@ -406,13 +406,24 @@ const AdminOrders = () => {
                 const steps = trackingSteps(order);
                 const isExpanded = expandedOrderId === order.id;
                 const trackingDraft = getTrackingDraft(order);
-                const shiprocketStatus = String(shipping?.shiprocketStatus || '').trim();
-                const shiprocketOrderId = String(shipping?.shiprocketOrderId || '').trim();
-                const shiprocketShipmentId = String(shipping?.shiprocketShipmentId || '').trim();
+                const shiprocketStatus = String(
+                  shipping?.shiprocketStatus || shipping?.shipmentStatus || shipping?.shipment_status || '',
+                ).trim();
+                const shiprocketOrderId = String(
+                  shipping?.shiprocketOrderId || shipping?.shiprocket_order_id || shipping?.order_id || '',
+                ).trim();
+                const shiprocketShipmentId = String(
+                  shipping?.shiprocketShipmentId || shipping?.shipmentId || shipping?.shipment_id || '',
+                ).trim();
+                const shiprocketProvisioningError = String(
+                  shipping?.shiprocketProvisioningError || '',
+                ).trim();
                 const awbCode = String(
                   shipping?.awbCode || shipping?.awb || shipping?.trackingNumber || '',
                 ).trim();
                 const isShiprocketWorking = shiprocketActionOrderId === order.id;
+                const canCreateShiprocketShipment =
+                  Boolean(shiprocketOrderId) && !shiprocketShipmentId && !awbCode;
 
                 return (
                   <React.Fragment key={order.id}>
@@ -507,18 +518,24 @@ const AdminOrders = () => {
                                 </div>
 
                                 <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => createShipment(order)}
-                                    disabled={isShiprocketWorking}
-                                    className="rounded-lg border border-blue-500/40 px-3 py-2 text-xs font-semibold text-blue-300 hover:bg-blue-500/10 disabled:opacity-60"
-                                  >
-                                    {isShiprocketWorking
-                                      ? 'Working...'
-                                      : shiprocketOrderId
-                                        ? 'Shipment Saved'
-                                        : 'Create Shiprocket Shipment'}
-                                  </button>
+                                  {canCreateShiprocketShipment ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => createShipment(order)}
+                                      disabled={isShiprocketWorking}
+                                      className="rounded-lg border border-blue-500/40 px-3 py-2 text-xs font-semibold text-blue-300 hover:bg-blue-500/10 disabled:opacity-60"
+                                    >
+                                      {isShiprocketWorking ? 'Working...' : 'Create Shiprocket Shipment'}
+                                    </button>
+                                  ) : (
+                                    <div className="rounded-lg border border-slate-700/60 px-3 py-2 text-xs font-semibold text-slate-500">
+                                      {shiprocketShipmentId || awbCode
+                                        ? 'Shipment already created'
+                                        : shiprocketOrderId
+                                          ? 'Shipment unavailable'
+                                          : 'Shiprocket order not created'}
+                                    </div>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => refreshTracking(order)}
@@ -551,6 +568,12 @@ const AdminOrders = () => {
                                     <p>Shiprocket order ID: {shiprocketOrderId || '-'}</p>
                                     <p>Shipment ID: {shiprocketShipmentId || '-'}</p>
                                     <p>AWB: {awbCode || '-'}</p>
+                                    {shiprocketProvisioningError ? (
+                                      <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-rose-200">
+                                        <p className="font-semibold text-rose-100">Shiprocket failed</p>
+                                        <p className="mt-1 break-words">{shiprocketProvisioningError}</p>
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>

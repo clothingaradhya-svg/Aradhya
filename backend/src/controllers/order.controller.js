@@ -384,6 +384,22 @@ const verifyRazorpaySignature = ({ razorpayOrderId, razorpayPaymentId, razorpayS
   return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
 };
 
+const formatProvisioningError = (error) => {
+  const message = String(error?.message || "Unable to create Shiprocket order.").trim();
+  const details = error?.details;
+  if (!details) return message;
+
+  if (typeof details === "string") {
+    return `${message}: ${details}`;
+  }
+
+  try {
+    return `${message}: ${JSON.stringify(details)}`;
+  } catch {
+    return message;
+  }
+};
+
 const tryProvisionShiprocketShipment = async (prisma, order) => {
   if (!orderShippingService.shouldCreateShipmentForOrder(order)) {
     return order;
@@ -400,9 +416,10 @@ const tryProvisionShiprocketShipment = async (prisma, order) => {
       },
     });
   } catch (error) {
+    const provisioningError = formatProvisioningError(error);
     console.error(
       `[Shiprocket] Unable to provision shipment for order ${order?.number || order?.id}:`,
-      error?.message || error,
+      provisioningError,
     );
     try {
       return await prisma.order.update({
@@ -414,7 +431,7 @@ const tryProvisionShiprocketShipment = async (prisma, order) => {
               ? error.shippingPatch
               : {}),
             shiprocketStatus: "Shipment Pending",
-            shiprocketProvisioningError: error?.message || "Unable to create shipment.",
+            shiprocketProvisioningError: provisioningError,
             shiprocketLastSyncedAt: new Date().toISOString(),
           },
         },

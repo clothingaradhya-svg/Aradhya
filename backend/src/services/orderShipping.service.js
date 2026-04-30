@@ -437,6 +437,7 @@ const buildShipmentPatch = (shipping = {}, context = {}) => {
 };
 
 const ensureShiprocketOrderForOrder = async (order, { allowExisting = false } = {}) => {
+  shiprocketService.validateRequiredConfig();
   const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
   const existingRefs = getExistingShiprocketRefs(shipping);
   const hasExistingRefs = Boolean(
@@ -525,6 +526,7 @@ const ensureShiprocketOrderForOrder = async (order, { allowExisting = false } = 
 };
 
 const createShiprocketShipmentForOrder = async (order, { allowExisting = false } = {}) => {
+  shiprocketService.validateRequiredConfig();
   const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
   const existingRefs = getExistingShiprocketRefs(shipping);
 
