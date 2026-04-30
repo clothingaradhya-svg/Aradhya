@@ -857,7 +857,7 @@ exports.listProducts = async (req, res, next) => {
 
     const isPublicGet = !isAdminRoute && !req.headers?.authorization;
     const cacheKey = isPublicGet
-      ? `products:${JSON.stringify({ where, take, skip, includeMode, skipCount })}`
+      ? `products:${JSON.stringify({ where, take, skip, includeMode, skipCount, homepageSection: homepageSectionValue })}`
       : null;
 
     const fetchData = async () => {
@@ -874,10 +874,13 @@ exports.listProducts = async (req, res, next) => {
           ),
           homepageSectionConfig,
         );
-        const pagedRows = sectionRows.slice(skip, skip + take);
+        const sectionHandles = new Set(sectionRows.map((product) => product.handle));
+        const fallbackRows = rows.filter((product) => !sectionHandles.has(product.handle));
+        const homepageRows = [...sectionRows, ...fallbackRows];
+        const pagedRows = homepageRows.slice(skip, skip + take);
         return {
           products: pagedRows,
-          total: sectionRows.length,
+          total: homepageRows.length,
           sectionTitle: readHomepageSectionTitle(sectionRows, homepageSectionConfig),
         };
       }
