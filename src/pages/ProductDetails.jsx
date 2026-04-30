@@ -794,11 +794,10 @@ const ProductDetails = () => {
       })?.value;
 
     if (hasSizes && !selectedSize && sizeOptions.length) {
-      const firstAvailable =
-        sizeOptions.find((size) =>
-          getAvailability(product, { size, color: selectedColor }).inStock,
-        ) ?? sizeOptions[0];
-      setSelectedSize(variantSize || firstAvailable);
+      const firstAvailable = sizeOptions.find((size) =>
+        getAvailability(product, { size, color: selectedColor }).inStock,
+      );
+      setSelectedSize(firstAvailable || variantSize || sizeOptions[0]);
     }
     if (hasColors && !selectedColor && colorOptions.length) {
       setSelectedColor(variantColor || colorOptions[0]);
@@ -821,6 +820,34 @@ const ProductDetails = () => {
       return acc;
     }, {});
   }, [product, hasSizes, sizeOptions, selectedColor, getAvailability]);
+
+  const firstAvailableSize = useMemo(
+    () => sizeOptions.find((size) => sizeAvailability[size]?.inStock) || null,
+    [sizeOptions, sizeAvailability],
+  );
+
+  const primarySelectedSize = hasSizes
+    ? (selectedSize || firstAvailableSize || null)
+    : null;
+
+  const currentAvailability = useMemo(() => {
+    if (!product) return { inStock: false, lowStock: false, quantity: null };
+    if (hasSizes) {
+      return primarySelectedSize
+        ? sizeAvailability[primarySelectedSize] ?? { inStock: false, lowStock: false, quantity: null }
+        : { inStock: false, lowStock: false, quantity: null };
+    }
+    return getAvailability(product, { size: null, color: selectedColor });
+  }, [
+    product,
+    hasSizes,
+    primarySelectedSize,
+    sizeAvailability,
+    getAvailability,
+    selectedColor,
+  ]);
+
+  const canAddCurrentProduct = Boolean(product?.handle && currentAvailability?.inStock);
 
   const toggleAccordion = (key) =>
     setOpenAccordion((current) => (current === key ? null : key));
@@ -866,22 +893,16 @@ const ProductDetails = () => {
 
   const handleAddToCart = () => {
     if (!product?.handle) return;
-    const primarySize = hasSizes
-      ? (selectedSize ||
-        sizeOptions.find((size) => sizeAvailability[size]?.inStock) ||
-        sizeOptions[0] ||
-        null)
-      : null;
+    const primarySize = primarySelectedSize;
 
-    if (hasSizes) {
-      const availability = primarySize ? sizeAvailability[primarySize] : null;
-      if (availability && !availability.inStock) {
-        notify({
-          title: 'Out of stock',
-          message: 'Selected size is not available. Please choose another size.',
-        });
-        return;
-      }
+    if (!canAddCurrentProduct && !hasComboItems) {
+      notify({
+        title: 'Out of stock',
+        message: hasSizes
+          ? 'Selected size is not available. Please choose another size.'
+          : 'This product is not available right now.',
+      });
+      return;
     }
 
     if (hasComboItems) {
@@ -1000,12 +1021,7 @@ const ProductDetails = () => {
   }, [comboItems, hasComboItems, showSizeChart]);
 
   const handleConfirmSizes = (itemsWithSizes) => {
-    const primarySize = hasSizes
-      ? (selectedSize ||
-        sizeOptions.find((size) => sizeAvailability[size]?.inStock) ||
-        sizeOptions[0] ||
-        null)
-      : null;
+    const primarySize = primarySelectedSize;
 
     if (hasComboItems) {
       const metaItems = itemsWithSizes
@@ -1702,9 +1718,10 @@ const ProductDetails = () => {
             {/* Desktop Add to Bag - Hidden on Mobile, rendered as sticky footer instead */}
             <button
               onClick={handleAddToCart}
-              className="hidden lg:block w-full bg-black text-white font-bold text-sm py-4 uppercase tracking-widest hover:bg-gray-900 transition-colors mb-6"
+              disabled={!hasComboItems && !canAddCurrentProduct}
+              className="hidden lg:block w-full bg-black text-white font-bold text-sm py-4 uppercase tracking-widest hover:bg-gray-900 transition-colors mb-6 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
             >
-              Add to Bag
+              {!hasComboItems && !canAddCurrentProduct ? 'Out of Stock' : 'Add to Bag'}
             </button>
 
 
@@ -2024,9 +2041,12 @@ const ProductDetails = () => {
       <div className="fixed bottom-[48px] left-0 right-0 z-40 bg-white/90 backdrop-blur-md px-4 pb-3 pt-3 flex items-center justify-center border-t border-gray-100 shadow-[0_-8px_20px_rgba(0,0,0,0.06)] lg:hidden">
         <button
           onClick={handleAddToCart}
-          className="flex h-12 w-[90%] md:w-[60%] lg:w-full max-w-sm items-center justify-center rounded-full bg-black text-white shadow-lg transition-transform active:scale-[0.98] hover:bg-gray-900"
+          disabled={!hasComboItems && !canAddCurrentProduct}
+          className="flex h-12 w-[90%] md:w-[60%] lg:w-full max-w-sm items-center justify-center rounded-full bg-black text-white shadow-lg transition-transform active:scale-[0.98] hover:bg-gray-900 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
         >
-          <span className="text-sm font-bold uppercase tracking-[0.15em]">Add to Bag</span>
+          <span className="text-sm font-bold uppercase tracking-[0.15em]">
+            {!hasComboItems && !canAddCurrentProduct ? 'Out of Stock' : 'Add to Bag'}
+          </span>
         </button>
       </div>
 

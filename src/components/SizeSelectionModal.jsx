@@ -52,10 +52,10 @@ const SizeSelectionModal = ({ isOpen, onClose, items = [], onConfirm }) => {
             hydratedItems.forEach((item) => {
                 const sizes = getSizeOptions(item);
                 if (sizes.length > 0) {
-                    const firstInStock =
-                        sizes.find((size) => getSizeAvailability(item, size).inStock) ??
-                        sizes[0];
-                    initial[item.handle] = firstInStock;
+                    const firstInStock = sizes.find((size) => getSizeAvailability(item, size).inStock);
+                    if (firstInStock) {
+                        initial[item.handle] = firstInStock;
+                    }
                 }
             });
             selectionsRef.current = initial;
@@ -85,14 +85,18 @@ const SizeSelectionModal = ({ isOpen, onClose, items = [], onConfirm }) => {
             const hasSizes = sizes.length > 0;
             const selected = selectionsRef.current[item.handle] || selections[item.handle];
             const fallbackSize = hasSizes
-                ? (sizes.find((size) => getSizeAvailability(item, size).inStock) ?? sizes[0] ?? null)
+                ? (sizes.find((size) => getSizeAvailability(item, size).inStock) ?? null)
                 : null;
+            const size = selected || fallbackSize;
+            const availability = getSizeAvailability(item, size);
+            if (!availability.inStock) return null;
             return {
                 handle: item.handle,
-                size: selected || fallbackSize,
+                size,
                 quantity: 1,
             };
-        });
+        }).filter(Boolean);
+        if (finalItems.length === 0) return;
         onConfirm(finalItems);
     };
 
@@ -173,7 +177,12 @@ const SizeSelectionModal = ({ isOpen, onClose, items = [], onConfirm }) => {
                 <div className="p-4 border-t border-gray-100 bg-gray-50">
                     <button
                         onClick={handleConfirm}
-                        className="w-full bg-[#1a1a2e] text-white font-bold text-sm py-4 uppercase tracking-widest hover:bg-gray-900 transition-colors rounded-sm"
+                        disabled={loadingItems || resolvedItems.every((item) => {
+                            const sizes = getSizeOptions(item);
+                            if (!sizes.length) return !getSizeAvailability(item, null).inStock;
+                            return sizes.every((size) => !getSizeAvailability(item, size).inStock);
+                        })}
+                        className="w-full bg-[#1a1a2e] text-white font-bold text-sm py-4 uppercase tracking-widest hover:bg-gray-900 transition-colors rounded-sm disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
                     >
                         Confirm and Add to Cart
                     </button>

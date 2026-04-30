@@ -277,6 +277,7 @@ export default function HomePage() {
           description="Premium menswear, modern Indian styling, and elevated essentials designed to make everyday dressing feel more confident."
           ctaLabel="Select Skintone"
           onCtaClick={handleSkintoneScroll}
+          showContent={false}
         />
       </div>
 
