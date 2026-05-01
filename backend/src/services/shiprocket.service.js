@@ -80,29 +80,8 @@ const ensureShiprocketCredentials = () => {
 
 const validateRequiredConfig = () => {
   ensureShiprocketCredentials();
-
-  const pickupLocation = String(env.shiprocketPickupLocation || "").trim();
-  const pickupPincode = String(env.shiprocketPickupPincode || "").trim();
-
-  if (!pickupLocation) {
-    logShiprocketError("Invalid pickup location", {
-      SHIPROCKET_PICKUP_LOCATION: pickupLocation,
-    });
-    throw createAppError(
-      "Shiprocket pickup location is missing. Set SHIPROCKET_PICKUP_LOCATION in Vercel production env vars.",
-      500,
-    );
-  }
-
-  if (!/^\d{6}$/.test(pickupPincode)) {
-    logShiprocketError("Invalid pickup pincode", {
-      SHIPROCKET_PICKUP_PINCODE: pickupPincode || null,
-    });
-    throw createAppError(
-      "Shiprocket pickup pincode is invalid. Set SHIPROCKET_PICKUP_PINCODE to a valid 6-digit pincode in Vercel production env vars.",
-      500,
-    );
-  }
+  // Note: SHIPROCKET_PICKUP_LOCATION is now optional — if missing, createOrder
+  // will auto-resolve the first active pickup location from Shiprocket's API.
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -688,7 +667,24 @@ const getAuthStatus = async () => {
 
 const createOrder = async (input) => {
   validateRequiredConfig();
-  const payload = buildCreateOrderPayload(input);
+
+  // Auto-resolve pickup location: use env var if set, otherwise fetch the first
+  // active pickup location from Shiprocket so orders never fail due to missing config.
+  const configuredPickup = String(env.shiprocketPickupLocation || "").trim();
+  let resolvedPickupLocation = configuredPickup || null;
+
+  if (!resolvedPickupLocation) {
+    logShiprocket("SHIPROCKET_PICKUP_LOCATION not set — auto-resolving from Shiprocket API");
+    const resolved = await resolvePickupLocation("").catch(() => ({ pickupLocation: null, source: "default" }));
+    resolvedPickupLocation = resolved.pickupLocation || null;
+    logShiprocket("Auto-resolved pickup location", { pickupLocation: resolvedPickupLocation, source: resolved.source });
+  }
+
+  const payload = buildCreateOrderPayload({
+    ...input,
+    pickupLocation: resolvedPickupLocation || input.pickupLocation || undefined,
+  });
+
   try {
     return await createOrderRequest(payload);
   } catch (error) {
@@ -696,7 +692,9 @@ const createOrder = async (input) => {
       throw error;
     }
 
-    const resolvedPickup = await resolvePickupLocation(payload.pickup_location).catch(
+    // Pickup location rejected by Shiprocket — try to resolve a valid one
+    logShiprocket("Pickup location rejected, re-resolving from Shiprocket API");
+    const fallback = await resolvePickupLocation(payload.pickup_location).catch(
       () => ({
         pickupLocation: null,
         source: "default",
@@ -705,7 +703,7 @@ const createOrder = async (input) => {
 
     const retryPayload = {
       ...payload,
-      pickup_location: resolvedPickup.pickupLocation || undefined,
+      pickup_location: fallback.pickupLocation || undefined,
     };
 
     return createOrderRequest(retryPayload);
