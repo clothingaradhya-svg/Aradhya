@@ -10,6 +10,8 @@ const resolveApiBase = () => {
 const API_BASE = resolveApiBase();
 const API_URL = API_BASE ? `${API_BASE}/api` : '/api';
 
+export const getApiBaseUrl = () => API_URL;
+
 const DEFAULT_LOCALE = import.meta.env.VITE_LOCALE || 'en-IN';
 const DEFAULT_CURRENCY = import.meta.env.VITE_CURRENCY || 'INR';
 

@@ -133,6 +133,27 @@ app.get('/', (_req, res) => {
   res.status(200).json({ message: 'Marvelle API is running successfully.' });
 });
 
+app.get('/api/health', (req, res) => {
+  const logInfo = {
+    timestamp: new Date().toISOString(),
+    host: req.get('host'),
+    path: req.originalUrl,
+    env: process.env.NODE_ENV || 'development'
+  };
+  console.log(`[ROUTE LOG] GET /api/health`, logInfo);
+
+  return res.json({
+    ok: true,
+    service: "backend",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development',
+    vercelProject: process.env.VERCEL_PROJECT_NAME || null,
+    vercelUrl: process.env.VERCEL_URL || null,
+    shiprocketPickupLocationPresent: !!process.env.SHIPROCKET_PICKUP_LOCATION,
+    shiprocketPickupPincodePresent: !!process.env.SHIPROCKET_PICKUP_PINCODE
+  });
+});
+
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);

@@ -1109,6 +1109,14 @@ exports.createShiprocketOrder = async (req, res, next) => {
 };
 
 exports.logCheckoutDebug = async (req, res) => {
+  const logInfo = {
+    timestamp: new Date().toISOString(),
+    host: req.get('host'),
+    path: req.originalUrl,
+    env: process.env.NODE_ENV || 'development'
+  };
+  console.log(`[ROUTE LOG] POST /api/checkout-debug`, logInfo);
+
   const body = req.body && typeof req.body === "object" ? req.body : {};
   console.info("[Checkout Debug]", {
     stage: body.stage || "unknown",
@@ -1128,6 +1136,14 @@ exports.logCheckoutDebug = async (req, res) => {
 
 exports.createCheckoutOrder = async (req, res, next) => {
   try {
+    const logInfo = {
+      timestamp: new Date().toISOString(),
+      host: req.get('host'),
+      path: req.originalUrl,
+      env: process.env.NODE_ENV || 'development'
+    };
+    console.log(`[ROUTE LOG] POST /api/create-order`, logInfo);
+
     const payload = createCheckoutOrderSchema.parse(req.body || {});
     const orderInput = payload.order;
     const normalizedMethod = normalizePaymentMethod(orderInput.paymentMethod || "PREPAID");

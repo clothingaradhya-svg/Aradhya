@@ -14,6 +14,7 @@ import {
   formatMoney,
   logCheckoutDebug,
   verifyDiscountCode,
+  getApiBaseUrl,
 } from '../lib/api';
 import { useAuth } from '../contexts/auth-context';
 import { useCart } from '../contexts/cart-context';
@@ -323,6 +324,12 @@ export default function Payment() {
   };
 
   const handlePlaceOrder = async () => {
+    const apiBaseUrl = getApiBaseUrl();
+    console.log('%c[CHECKOUT DEBUG] resolved API base URL:', 'color: #bada55; font-weight: bold', apiBaseUrl);
+    console.log('%c[CHECKOUT DEBUG] full checkout-debug URL:', 'color: #bada55; font-weight: bold', `${apiBaseUrl}/checkout-debug`);
+    console.log('%c[CHECKOUT DEBUG] full create-order URL:', 'color: #bada55; font-weight: bold', `${apiBaseUrl}/create-order`);
+    console.log('%c[CHECKOUT DEBUG] payment method:', 'color: #bada55; font-weight: bold', selectedPayment);
+
     await sendCheckoutDebug('place_order_clicked');
 
     if (!draft?.items?.length || placingOrder) {
@@ -374,6 +381,7 @@ export default function Payment() {
     }
 
     const orderPayload = buildOrderPayload();
+    console.log('%c[CHECKOUT DEBUG] built order payload (orderNumber usually null here):', 'color: #bada55; font-weight: bold', orderPayload?.number || 'not-assigned');
 
     if (selectedPayment === 'COD') {
       try {
