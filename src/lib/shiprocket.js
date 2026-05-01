@@ -75,7 +75,7 @@ export const trackOrder = async ({ awbCode, orderId }) =>
 
 export const checkServiceability = async (
   deliveryPostcode,
-  pickupPostcode = '700001',
+  pickupPostcode = '711303',
   weight = 0.5,
   cod = 1,
 ) => {

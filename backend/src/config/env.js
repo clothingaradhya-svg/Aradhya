@@ -30,7 +30,7 @@ const env = {
   shiprocketEmail: process.env.SHIPROCKET_EMAIL,
   shiprocketPassword: process.env.SHIPROCKET_PASSWORD,
   shiprocketPickupLocation: String(process.env.SHIPROCKET_PICKUP_LOCATION || '').trim(),
-  shiprocketPickupPincode: process.env.SHIPROCKET_PICKUP_PINCODE || '711403',
+  shiprocketPickupPincode: process.env.SHIPROCKET_PICKUP_PINCODE || '711303',
   shiprocketDefaultCountry: process.env.SHIPROCKET_DEFAULT_COUNTRY || 'India',
   shiprocketDefaultWeight: toNumber(process.env.SHIPROCKET_DEFAULT_WEIGHT, 0.5),
   shiprocketDefaultLength: toNumber(process.env.SHIPROCKET_DEFAULT_LENGTH, 10),

@@ -22,8 +22,8 @@ const PincodeChecker = ({ onPincodeCheck }) => {
         }
 
         try {
-            // Using default pickup location '711413' as per business logic (from About page)
-            const response = await checkServiceability(code, '711413');
+            // Pickup pincode for Srs 185 Sarada Dogora, Howrah.
+            const response = await checkServiceability(code, '711303');
             const formatted = formatServiceabilityResponse(response);
 
             if (formatted.serviceable) {

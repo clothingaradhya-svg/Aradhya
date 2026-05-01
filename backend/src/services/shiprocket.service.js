@@ -668,8 +668,8 @@ const getAuthStatus = async () => {
 const createOrder = async (input) => {
   validateRequiredConfig();
 
-  // Auto-resolve pickup location: use env var if set, otherwise fetch the first
-  // active pickup location from Shiprocket so orders never fail due to missing config.
+  // Auto-resolve only when no pickup is configured. If the business configured
+  // a pickup location, never silently fall back to another warehouse.
   const configuredPickup = String(env.shiprocketPickupLocation || "").trim();
   let resolvedPickupLocation = configuredPickup || null;
 
@@ -690,6 +690,14 @@ const createOrder = async (input) => {
   } catch (error) {
     if (!isPickupLocationError(error)) {
       throw error;
+    }
+
+    if (configuredPickup) {
+      throw createAppError(
+        `Shiprocket rejected configured pickup location "${configuredPickup}". Create or rename the pickup address in Shiprocket to exactly match SHIPROCKET_PICKUP_LOCATION.`,
+        400,
+        error?.details || error?.message || null,
+      );
     }
 
     // Pickup location rejected by Shiprocket — try to resolve a valid one

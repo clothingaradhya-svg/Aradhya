@@ -53,6 +53,8 @@ Important:
 - If you set both, the backend will use the pasted token first and fall back to logging in again when that token expires or Shiprocket rejects it.
 - Use your Shiprocket API user email/password, not your normal dashboard login.
 - The Shiprocket pickup location must already exist in your Shiprocket account.
+- Current pickup address: Srs 185 Sarada Dogora, Sarada Dogora, Howrah, West Bengal, India, 711303.
+- Warehouse SPOC: Rik Samanta, 7602455773.
 
 ## 3. Run the app
 
@@ -119,7 +121,7 @@ Then:
 ```
 
 - `GET /api/shiprocket/track?awb=...`
-- `GET /api/shiprocket/serviceability?pickup_postcode=711413&delivery_postcode=110001&weight=0.5&cod=1`
+- `GET /api/shiprocket/serviceability?pickup_postcode=711303&delivery_postcode=110001&weight=0.5&cod=1`
 
 The `order_id` tracking fallback is included in the backend as a best-effort convenience, but Shiprocket's public docs clearly document AWB tracking as the primary tracking path.
 
