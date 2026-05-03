@@ -986,6 +986,9 @@ export const fetchSiteSettings = async () =>
 export const adminFetchSiteSettings = async (token) =>
   unwrap(await requestWithAuth('/admin/site-settings', token, { cache: 'no-store' }));
 
+export const adminFetchOwnerSiteSettings = async (token) =>
+  unwrap(await requestWithAuth('/admin/owner/site-settings', token, { cache: 'no-store' }));
+
 export const adminUpdateSiteSettings = async (token, data) =>
   unwrap(
     await requestWithAuth('/admin/site-settings', token, {

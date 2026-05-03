@@ -8,6 +8,7 @@ import MetaAdvancedMatchingTracker from './components/MetaAdvancedMatchingTracke
 import ScrollToTop from './components/ScrollToTop';
 import { AdminToastProvider } from './components/admin/AdminToaster';
 import { fetchSiteSettings } from './lib/api';
+import { OWNER_CONTROL_PATH } from './lib/adminOwner';
 
 const Layout = lazy(() => import('./components/Layout'));
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -50,7 +51,6 @@ const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminWebsiteControl = lazy(() => import('./pages/admin/AdminWebsiteControl'));
 
 const RouteFallback = () => <div className="min-h-screen bg-white" />;
-const OWNER_CONTROL_PATH = '/as-owner-vault/status-console';
 
 const OwnerWebsiteControlRoute = () => (
   <AdminProvider>
@@ -68,9 +68,9 @@ const SiteOfflineScreen = ({ message }) => (
   <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
     <div className="max-w-md text-center">
       <p className="text-xs uppercase tracking-[0.35em] text-white/45">Aradhya</p>
-      <h1 className="mt-5 text-3xl font-semibold tracking-tight">Website is offline</h1>
+      <h1 className="mt-5 text-3xl font-semibold tracking-tight">{message?.title || 'Website is offline'}</h1>
       <p className="mt-4 text-sm leading-6 text-white/65">
-        {message || 'We are updating the store. Please check back soon.'}
+        {message?.message || message || 'We are updating the store. Please check back soon.'}
       </p>
     </div>
   </main>
@@ -100,7 +100,7 @@ const SiteStatusGate = ({ children }) => {
   }, [isAdminPath, isOwnerPath, location.pathname]);
 
   if (!isAdminPath && !isOwnerPath && settings?.isOnline === false) {
-    return <SiteOfflineScreen message={settings.message} />;
+    return <SiteOfflineScreen message={settings} />;
   }
 
   return children;

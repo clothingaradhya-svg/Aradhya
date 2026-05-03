@@ -12,6 +12,7 @@ router.get('/site-settings', adminController.getSiteSettings);
 router.use(protect, requireRole('ADMIN'));
 
 router.get('/stats', adminController.getStats);
+router.get('/owner/site-settings', adminController.getOwnerSiteSettings);
 router.patch('/site-settings', adminController.updateSiteSettings);
 
 router.get('/products', productController.listProducts);

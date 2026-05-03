@@ -14,6 +14,7 @@ const loginSchema = z.object({
 
 const siteSettingsSchema = z.object({
   isOnline: z.boolean(),
+  title: z.string().trim().max(80).optional(),
   message: z.string().trim().max(240).optional(),
 });
 
@@ -21,6 +22,7 @@ const SITE_SETTINGS_TYPE = 'app_setting';
 const SITE_SETTINGS_HANDLE = 'site_status';
 const DEFAULT_SITE_SETTINGS = {
   isOnline: true,
+  title: 'Website is offline',
   message: 'We are updating the store. Please check back soon.',
 };
 
@@ -202,10 +204,39 @@ exports.getSiteSettings = async (_req, res, next) => {
   }
 };
 
+const isOwnerRequest = (req) =>
+  String(req.user?.email || '').trim().toLowerCase() === env.ownerAdminEmail;
+
+exports.getOwnerSiteSettings = async (req, res, next) => {
+  try {
+    if (!isOwnerRequest(req)) {
+      return sendError(res, 403, 'Only the owner admin can manage website control.');
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    const prisma = await getPrisma();
+    const settings = await readSiteSettings(prisma);
+    return sendSuccess(res, {
+      settings,
+      owner: {
+        email: req.user.email,
+        access: 'OWNER',
+      },
+      backend: {
+        ok: true,
+        env: env.nodeEnv,
+        timestamp: new Date().toISOString(),
+        databaseConfigured: !!env.databaseUrl,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 exports.updateSiteSettings = async (req, res, next) => {
   try {
-    const requesterEmail = String(req.user?.email || '').trim().toLowerCase();
-    if (requesterEmail !== env.ownerAdminEmail) {
+    if (!isOwnerRequest(req)) {
       return sendError(res, 403, 'Only the owner admin can manage website control.');
     }
 
