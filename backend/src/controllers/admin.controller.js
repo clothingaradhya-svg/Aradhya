@@ -11,6 +11,34 @@ const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+const siteSettingsSchema = z.object({
+  isOnline: z.boolean(),
+  message: z.string().trim().max(240).optional(),
+});
+
+const SITE_SETTINGS_TYPE = 'app_setting';
+const SITE_SETTINGS_HANDLE = 'site_status';
+const DEFAULT_SITE_SETTINGS = {
+  isOnline: true,
+  message: 'We are updating the store. Please check back soon.',
+};
+
+const normalizeSiteSettings = (value) => ({
+  ...DEFAULT_SITE_SETTINGS,
+  ...(value && typeof value === 'object' ? value : {}),
+  isOnline: value?.isOnline !== false,
+});
+
+const readSiteSettings = async (prisma) => {
+  const row = await prisma.metaobject.findFirst({
+    where: {
+      type: SITE_SETTINGS_TYPE,
+      handle: SITE_SETTINGS_HANDLE,
+    },
+  });
+  return normalizeSiteSettings(row?.fields);
+};
+
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
@@ -158,6 +186,55 @@ exports.getStats = async (req, res, next) => {
       },
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+exports.getSiteSettings = async (_req, res, next) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    const prisma = await getPrisma();
+    const settings = await readSiteSettings(prisma);
+    return sendSuccess(res, settings);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.updateSiteSettings = async (req, res, next) => {
+  try {
+    const payload = siteSettingsSchema.parse(req.body);
+    const prisma = await getPrisma();
+    const value = normalizeSiteSettings(payload);
+
+    const existing = await prisma.metaobject.findFirst({
+      where: {
+        type: SITE_SETTINGS_TYPE,
+        handle: SITE_SETTINGS_HANDLE,
+      },
+      select: { id: true },
+    });
+
+    const row = existing
+      ? await prisma.metaobject.update({
+        where: { id: existing.id },
+        data: { fields: value, publishedAt: new Date() },
+      })
+      : await prisma.metaobject.create({
+        data: {
+          type: SITE_SETTINGS_TYPE,
+          handle: SITE_SETTINGS_HANDLE,
+          fields: value,
+          publishedAt: new Date(),
+        },
+      });
+
+    res.setHeader('Cache-Control', 'no-store');
+    return sendSuccess(res, normalizeSiteSettings(row.fields));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, error.errors[0]?.message || 'Invalid payload');
+    }
     return next(error);
   }
 };

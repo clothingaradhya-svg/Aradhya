@@ -1,11 +1,12 @@
 // src/App.jsx
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/auth-context';
 import { AdminProvider } from './contexts/admin-auth-context';
 import AnalyticsTracker from './components/AnalyticsTracker';
 import MetaAdvancedMatchingTracker from './components/MetaAdvancedMatchingTracker';
 import ScrollToTop from './components/ScrollToTop';
+import { fetchSiteSettings } from './lib/api';
 
 const Layout = lazy(() => import('./components/Layout'));
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -44,8 +45,50 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
 const AdminDiscounts = lazy(() => import('./pages/admin/AdminDiscounts'));
 const AdminHomepageSections = lazy(() => import('./pages/admin/AdminHomepageSections'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 
 const RouteFallback = () => <div className="min-h-screen bg-white" />;
+
+const SiteOfflineScreen = ({ message }) => (
+  <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+    <div className="max-w-md text-center">
+      <p className="text-xs uppercase tracking-[0.35em] text-white/45">Aradhya</p>
+      <h1 className="mt-5 text-3xl font-semibold tracking-tight">Website is offline</h1>
+      <p className="mt-4 text-sm leading-6 text-white/65">
+        {message || 'We are updating the store. Please check back soon.'}
+      </p>
+    </div>
+  </main>
+);
+
+const SiteStatusGate = ({ children }) => {
+  const location = useLocation();
+  const [settings, setSettings] = useState(null);
+  const isAdminPath = location.pathname.startsWith('/admin');
+
+  useEffect(() => {
+    if (isAdminPath) return;
+    let active = true;
+
+    fetchSiteSettings()
+      .then((data) => {
+        if (active) setSettings(data);
+      })
+      .catch(() => {
+        if (active) setSettings({ isOnline: true });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAdminPath, location.pathname]);
+
+  if (!isAdminPath && settings?.isOnline === false) {
+    return <SiteOfflineScreen message={settings.message} />;
+  }
+
+  return children;
+};
 
 export default function App() {
   return (
@@ -54,8 +97,9 @@ export default function App() {
         <MetaAdvancedMatchingTracker />
         <AnalyticsTracker />
         <ScrollToTop />
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
+        <SiteStatusGate>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
             <Route
               path="/admin/login"
               element={(
@@ -84,6 +128,7 @@ export default function App() {
               <Route path="discounts" element={<AdminDiscounts />} />
               <Route path="reviews" element={<AdminReviews />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
@@ -129,8 +174,9 @@ export default function App() {
               <Route path="product" element={<Navigate to="/" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </SiteStatusGate>
       </Router>
     </AuthProvider>
   );

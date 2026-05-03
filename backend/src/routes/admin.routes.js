@@ -7,10 +7,12 @@ const { protect, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
 router.post('/login', adminController.login);
+router.get('/site-settings', adminController.getSiteSettings);
 
 router.use(protect, requireRole('ADMIN'));
 
 router.get('/stats', adminController.getStats);
+router.patch('/site-settings', adminController.updateSiteSettings);
 
 router.get('/products', productController.listProducts);
 router.get('/products/export', productController.exportProducts);

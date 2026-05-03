@@ -97,6 +97,10 @@ const AdminLayout = () => {
                 <Users className="w-5 h-5" />
                 <span>Users</span>
               </NavLink>
+              <NavLink to="/admin/settings" className={navItemClass}>
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </NavLink>
             </nav>
           </div>
 
@@ -131,9 +135,13 @@ const AdminLayout = () => {
               <p className="text-xs text-slate-400 mt-1">Manage your platform and track performance.</p>
             </div>
             <div className="flex items-center gap-4">
-              <button className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <NavLink
+                to="/admin/settings"
+                className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Settings"
+              >
                 <Settings className="w-5 h-5" />
-              </button>
+              </NavLink>
             </div>
           </header>
 

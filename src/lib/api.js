@@ -113,10 +113,14 @@ const inflightRequests = new Map();
 const responseCache = new Map();
 const RESPONSE_CACHE_TTL = 60_000;
 
-const request = async (path, { method = 'GET', headers = {}, body, keepalive = false } = {}) => {
+const request = async (
+  path,
+  { method = 'GET', headers = {}, body, keepalive = false, cache } = {},
+) => {
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
   const options = { method, headers: { ...headers } };
   if (keepalive) options.keepalive = true;
+  if (cache) options.cache = cache;
 
   if (body !== undefined) {
     if (body instanceof FormData) {
@@ -129,7 +133,7 @@ const request = async (path, { method = 'GET', headers = {}, body, keepalive = f
 
   const methodUpper = String(method || 'GET').toUpperCase();
   const cacheKey =
-    methodUpper === 'GET' && body === undefined
+    methodUpper === 'GET' && body === undefined && cache !== 'no-store'
       ? `${url}|auth:${options.headers.Authorization || ''}`
       : null;
 
@@ -975,6 +979,20 @@ export const adminLogin = async ({ email, password }) => {
   });
   return unwrap(payload);
 };
+
+export const fetchSiteSettings = async () =>
+  unwrap(await request('/admin/site-settings', { cache: 'no-store' }));
+
+export const adminFetchSiteSettings = async (token) =>
+  unwrap(await requestWithAuth('/admin/site-settings', token, { cache: 'no-store' }));
+
+export const adminUpdateSiteSettings = async (token, data) =>
+  unwrap(
+    await requestWithAuth('/admin/site-settings', token, {
+      method: 'PATCH',
+      body: data,
+    }),
+  );
 
 export const adminFetchProducts = async (token, params = {}) => {
   const finalParams = { include: 'compact', ...params };
