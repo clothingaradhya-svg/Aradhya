@@ -13,6 +13,9 @@ router.use(protect, requireRole('ADMIN'));
 
 router.get('/stats', adminController.getStats);
 router.get('/owner/site-settings', adminController.getOwnerSiteSettings);
+router.get('/owner/products', adminController.listOwnerProducts);
+router.patch('/owner/products/:id/visibility', adminController.updateOwnerProductVisibility);
+router.patch('/owner/credentials', adminController.updateOwnerCredentials);
 router.patch('/site-settings', adminController.updateSiteSettings);
 
 router.get('/products', productController.listProducts);

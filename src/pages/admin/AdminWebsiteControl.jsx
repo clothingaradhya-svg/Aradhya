@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, Database, Globe2, LockKeyhole, Power, RefreshCw, Save, ShieldAlert } from 'lucide-react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { adminFetchOwnerSiteSettings, adminUpdateSiteSettings } from '../../lib/api';
+import {
+  adminFetchOwnerProducts,
+  adminFetchOwnerSiteSettings,
+  adminUpdateOwnerCredentials,
+  adminUpdateOwnerProductVisibility,
+  adminUpdateSiteSettings,
+} from '../../lib/api';
 import { useAdminAuth } from '../../contexts/admin-auth-context';
 import { useAdminToast } from '../../components/admin/AdminToaster';
 import { isOwnerAdmin } from '../../lib/adminOwner';
@@ -34,8 +40,15 @@ const AdminWebsiteControl = () => {
     message: DEFAULT_OFFLINE_MESSAGE,
   });
   const [ownerStatus, setOwnerStatus] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [credentials, setCredentials] = useState({
+    email: '',
+    currentPassword: '',
+    newPassword: '',
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [productSavingId, setProductSavingId] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -46,7 +59,10 @@ const AdminWebsiteControl = () => {
       setLoading(true);
       setError('');
       try {
-        const data = await adminFetchOwnerSiteSettings(token);
+        const [data, ownerProducts] = await Promise.all([
+          adminFetchOwnerSiteSettings(token),
+          adminFetchOwnerProducts(token),
+        ]);
         const siteSettings = data?.settings || data;
         if (active) {
           setSettings({
@@ -55,6 +71,11 @@ const AdminWebsiteControl = () => {
             message: siteSettings?.message || DEFAULT_OFFLINE_MESSAGE,
           });
           setOwnerStatus(data || null);
+          setCredentials((prev) => ({
+            ...prev,
+            email: data?.owner?.email || admin?.email || '',
+          }));
+          setProducts(Array.isArray(ownerProducts) ? ownerProducts : []);
         }
       } catch (err) {
         if (active) setError(err?.message || 'Unable to load website control.');
@@ -92,6 +113,51 @@ const AdminWebsiteControl = () => {
     const nextSettings = { ...settings, isOnline: !settings.isOnline };
     setSettings(nextSettings);
     saveSettings(nextSettings);
+  };
+
+  const updateProductVisibility = async (product, nextStatus) => {
+    if (!product?.id || productSavingId) return;
+    setProductSavingId(product.id);
+    setError('');
+    try {
+      const updated = await adminUpdateOwnerProductVisibility(token, product.id, nextStatus);
+      setProducts((prev) =>
+        prev.map((item) => (item.id === product.id ? { ...item, ...updated } : item)),
+      );
+      toast.success('Product Updated', nextStatus === 'ACTIVE' ? 'Product is visible.' : 'Product is hidden.');
+    } catch (err) {
+      setError(err?.message || 'Unable to update product visibility.');
+      toast.error('Update Failed', err?.message || 'Unable to update product visibility.');
+    } finally {
+      setProductSavingId('');
+    }
+  };
+
+  const saveCredentials = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const result = await adminUpdateOwnerCredentials(token, {
+        email: credentials.email,
+        currentPassword: credentials.currentPassword,
+        newPassword: credentials.newPassword || undefined,
+      });
+      if (result?.token) {
+        localStorage.setItem('admin_auth_token', result.token);
+      }
+      setCredentials((prev) => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+      }));
+      toast.success('Owner Login Updated', 'Sign in details were updated.');
+    } catch (err) {
+      setError(err?.message || 'Unable to update owner login.');
+      toast.error('Update Failed', err?.message || 'Unable to update owner login.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (authLoading) {
@@ -235,6 +301,106 @@ const AdminWebsiteControl = () => {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-800/60 bg-[#0d1323] p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-slate-500">Product Visibility</p>
+            <h3 className="mt-2 text-2xl font-black tracking-tight text-white">Show or hide products</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-xs font-bold text-slate-200 transition hover:bg-slate-700"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
+        <div className="max-h-[420px] overflow-y-auto rounded-xl border border-slate-800/60">
+          {products.length ? (
+            products.map((product) => {
+              const isVisible = product.status === 'ACTIVE';
+              return (
+                <div key={product.id} className="flex items-center justify-between gap-4 border-b border-slate-800/60 px-4 py-3 last:border-b-0">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-950">
+                      {product.media?.[0]?.url ? (
+                        <img src={product.media[0].url} alt={product.media[0].alt || product.title} className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-white">{product.title}</p>
+                      <p className="truncate text-xs text-slate-500">/{product.handle}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updateProductVisibility(product, isVisible ? 'DRAFT' : 'ACTIVE')}
+                    disabled={productSavingId === product.id}
+                    className={`inline-flex min-w-28 items-center justify-center rounded-xl px-4 py-2 text-xs font-black transition disabled:opacity-60 ${isVisible ? 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    {productSavingId === product.id ? 'Saving...' : isVisible ? 'Showing' : 'Hidden'}
+                  </button>
+                </div>
+              );
+            })
+          ) : (
+            <div className="px-4 py-8 text-center text-sm text-slate-500">No products found.</div>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-800/60 bg-[#0d1323] p-6 shadow-xl">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-slate-500">Owner Login</p>
+          <h3 className="mt-2 text-2xl font-black tracking-tight text-white">Change admin email or password</h3>
+          <p className="mt-2 text-sm leading-6 text-amber-200">
+            After changing email, update Vercel owner email env values to the same email.
+          </p>
+        </div>
+        <form onSubmit={saveCredentials} className="mt-5 grid gap-4 md:grid-cols-3">
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Admin Email</span>
+            <input
+              type="email"
+              value={credentials.email}
+              onChange={(event) => setCredentials((prev) => ({ ...prev, email: event.target.value }))}
+              className="mt-3 w-full rounded-xl border border-slate-700/60 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-blue-500"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Current Password</span>
+            <input
+              type="password"
+              value={credentials.currentPassword}
+              onChange={(event) => setCredentials((prev) => ({ ...prev, currentPassword: event.target.value }))}
+              className="mt-3 w-full rounded-xl border border-slate-700/60 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-blue-500"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">New Password</span>
+            <input
+              type="password"
+              value={credentials.newPassword}
+              onChange={(event) => setCredentials((prev) => ({ ...prev, newPassword: event.target.value }))}
+              className="mt-3 w-full rounded-xl border border-slate-700/60 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-blue-500"
+              minLength={6}
+            />
+          </label>
+          <div className="md:col-span-3">
+            <button
+              type="submit"
+              disabled={saving || !credentials.currentPassword}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-xs font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Save className="h-4 w-4" />
+              Save Login
+            </button>
+          </div>
+        </form>
       </section>
     </div>
   );

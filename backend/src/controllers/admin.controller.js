@@ -18,6 +18,20 @@ const siteSettingsSchema = z.object({
   message: z.string().trim().max(240).optional(),
 });
 
+const ownerCredentialsSchema = z
+  .object({
+    email: z.string().email().optional(),
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: z.string().min(6, 'New password must be at least 6 characters').optional(),
+  })
+  .refine((payload) => payload.email || payload.newPassword, {
+    message: 'No changes provided',
+  });
+
+const ownerProductVisibilitySchema = z.object({
+  status: z.enum(['ACTIVE', 'DRAFT', 'ARCHIVED']),
+});
+
 const SITE_SETTINGS_TYPE = 'app_setting';
 const SITE_SETTINGS_HANDLE = 'site_status';
 const DEFAULT_SITE_SETTINGS = {
@@ -230,6 +244,121 @@ exports.getOwnerSiteSettings = async (req, res, next) => {
       },
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+exports.listOwnerProducts = async (req, res, next) => {
+  try {
+    if (!isOwnerRequest(req)) {
+      return sendError(res, 403, 'Only the owner admin can manage website control.');
+    }
+
+    const prisma = await getPrisma();
+    const products = await prisma.product.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        handle: true,
+        status: true,
+        updatedAt: true,
+        media: {
+          take: 1,
+          orderBy: { position: 'asc' },
+          select: { url: true, alt: true },
+        },
+      },
+    });
+
+    return sendSuccess(res, products);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.updateOwnerProductVisibility = async (req, res, next) => {
+  try {
+    if (!isOwnerRequest(req)) {
+      return sendError(res, 403, 'Only the owner admin can manage website control.');
+    }
+
+    const { status } = ownerProductVisibilitySchema.parse(req.body);
+    const prisma = await getPrisma();
+    const product = await prisma.product.update({
+      where: { id: req.params.id },
+      data: {
+        status,
+        publishedAt: status === 'ACTIVE' ? new Date() : null,
+      },
+      select: {
+        id: true,
+        title: true,
+        handle: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
+
+    return sendSuccess(res, product);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, error.errors[0]?.message || 'Invalid payload');
+    }
+    if (error.code === 'P2025') {
+      return sendError(res, 404, 'Product not found');
+    }
+    return next(error);
+  }
+};
+
+exports.updateOwnerCredentials = async (req, res, next) => {
+  try {
+    if (!isOwnerRequest(req)) {
+      return sendError(res, 403, 'Only the owner admin can manage website control.');
+    }
+
+    const payload = ownerCredentialsSchema.parse(req.body);
+    const prisma = await getPrisma();
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, email: true, name: true, role: true, passwordHash: true },
+    });
+
+    if (!user?.passwordHash) {
+      return sendError(res, 404, 'Owner account not found.');
+    }
+
+    const isValid = await bcrypt.compare(payload.currentPassword, user.passwordHash);
+    if (!isValid) {
+      return sendError(res, 400, 'Current password is incorrect.');
+    }
+
+    const data = {};
+    if (payload.email) data.email = payload.email.trim().toLowerCase();
+    if (payload.newPassword) {
+      const salt = await bcrypt.genSalt(10);
+      data.passwordHash = await bcrypt.hash(payload.newPassword, salt);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data,
+      select: { id: true, email: true, name: true, role: true },
+    });
+
+    return sendSuccess(res, {
+      user: updated,
+      token: signToken({ id: updated.id, role: updated.role }),
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, error.errors[0]?.message || 'Invalid payload');
+    }
+    if (error.code === 'P2002') {
+      return sendError(res, 409, 'Email already exists');
+    }
     return next(error);
   }
 };

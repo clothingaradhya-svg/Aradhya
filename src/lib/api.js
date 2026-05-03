@@ -989,6 +989,25 @@ export const adminFetchSiteSettings = async (token) =>
 export const adminFetchOwnerSiteSettings = async (token) =>
   unwrap(await requestWithAuth('/admin/owner/site-settings', token, { cache: 'no-store' }));
 
+export const adminFetchOwnerProducts = async (token) =>
+  unwrap(await requestWithAuth('/admin/owner/products', token, { cache: 'no-store' }));
+
+export const adminUpdateOwnerProductVisibility = async (token, productId, status) =>
+  unwrap(
+    await requestWithAuth(`/admin/owner/products/${encodeURIComponent(productId)}/visibility`, token, {
+      method: 'PATCH',
+      body: { status },
+    }),
+  );
+
+export const adminUpdateOwnerCredentials = async (token, data) =>
+  unwrap(
+    await requestWithAuth('/admin/owner/credentials', token, {
+      method: 'PATCH',
+      body: data,
+    }),
+  );
+
 export const adminUpdateSiteSettings = async (token, data) =>
   unwrap(
     await requestWithAuth('/admin/site-settings', token, {

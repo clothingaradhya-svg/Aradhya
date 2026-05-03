@@ -966,6 +966,9 @@ exports.getProduct = async (req, res, next) => {
       return sendError(res, 404, 'Product not found');
     }
     if (!req.headers?.authorization) {
+      if (product.status !== 'ACTIVE') {
+        return sendError(res, 404, 'Product not found');
+      }
       res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
     }
     return sendSuccess(res, toProductResponse(product));
