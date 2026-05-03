@@ -6,6 +6,7 @@ import { AdminProvider } from './contexts/admin-auth-context';
 import AnalyticsTracker from './components/AnalyticsTracker';
 import MetaAdvancedMatchingTracker from './components/MetaAdvancedMatchingTracker';
 import ScrollToTop from './components/ScrollToTop';
+import { AdminToastProvider } from './components/admin/AdminToaster';
 import { fetchSiteSettings } from './lib/api';
 
 const Layout = lazy(() => import('./components/Layout'));
@@ -50,6 +51,18 @@ const AdminWebsiteControl = lazy(() => import('./pages/admin/AdminWebsiteControl
 
 const RouteFallback = () => <div className="min-h-screen bg-white" />;
 
+const OwnerWebsiteControlRoute = () => (
+  <AdminProvider>
+    <AdminToastProvider>
+      <main className="min-h-screen bg-[#0a0f1c] px-6 py-8 text-slate-100">
+        <div className="mx-auto max-w-5xl">
+          <AdminWebsiteControl />
+        </div>
+      </main>
+    </AdminToastProvider>
+  </AdminProvider>
+);
+
 const SiteOfflineScreen = ({ message }) => (
   <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
     <div className="max-w-md text-center">
@@ -66,9 +79,10 @@ const SiteStatusGate = ({ children }) => {
   const location = useLocation();
   const [settings, setSettings] = useState(null);
   const isAdminPath = location.pathname.startsWith('/admin');
+  const isOwnerPath = location.pathname.startsWith('/owner');
 
   useEffect(() => {
-    if (isAdminPath) return;
+    if (isAdminPath || isOwnerPath) return;
     let active = true;
 
     fetchSiteSettings()
@@ -82,9 +96,9 @@ const SiteStatusGate = ({ children }) => {
     return () => {
       active = false;
     };
-  }, [isAdminPath, location.pathname]);
+  }, [isAdminPath, isOwnerPath, location.pathname]);
 
-  if (!isAdminPath && settings?.isOnline === false) {
+  if (!isAdminPath && !isOwnerPath && settings?.isOnline === false) {
     return <SiteOfflineScreen message={settings.message} />;
   }
 
@@ -129,9 +143,9 @@ export default function App() {
               <Route path="discounts" element={<AdminDiscounts />} />
               <Route path="reviews" element={<AdminReviews />} />
               <Route path="users" element={<AdminUsers />} />
-              <Route path="website-control" element={<AdminWebsiteControl />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
+            <Route path="/owner/website-control" element={<OwnerWebsiteControlRoute />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
               <Route path="search" element={<SearchPage />} />

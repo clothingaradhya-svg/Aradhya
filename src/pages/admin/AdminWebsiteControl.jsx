@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Globe2, Power, Save, ShieldAlert } from 'lucide-react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { adminFetchSiteSettings, adminUpdateSiteSettings } from '../../lib/api';
 import { useAdminAuth } from '../../contexts/admin-auth-context';
 import { useAdminToast } from '../../components/admin/AdminToaster';
@@ -9,7 +9,8 @@ import { isOwnerAdmin } from '../../lib/adminOwner';
 const DEFAULT_OFFLINE_MESSAGE = 'We are updating the store. Please check back soon.';
 
 const AdminWebsiteControl = () => {
-  const { admin, token } = useAdminAuth();
+  const { admin, token, isAuthenticated, loading: authLoading } = useAdminAuth();
+  const location = useLocation();
   const toast = useAdminToast();
   const [settings, setSettings] = useState({
     isOnline: true,
@@ -71,8 +72,21 @@ const AdminWebsiteControl = () => {
     saveSettings(nextSettings);
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[360px] flex-col items-center justify-center gap-4">
+        <div className="h-8 w-8 rounded-full border-2 border-slate-700 border-t-blue-500 animate-spin" />
+        <div className="text-xs uppercase tracking-[0.3em] text-slate-400 font-medium">Checking owner access...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
+  }
+
   if (!isOwnerAdmin(admin)) {
-    return <Navigate to="/admin/settings" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (loading) {
