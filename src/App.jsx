@@ -46,6 +46,7 @@ const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
 const AdminDiscounts = lazy(() => import('./pages/admin/AdminDiscounts'));
 const AdminHomepageSections = lazy(() => import('./pages/admin/AdminHomepageSections'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+const AdminWebsiteControl = lazy(() => import('./pages/admin/AdminWebsiteControl'));
 
 const RouteFallback = () => <div className="min-h-screen bg-white" />;
 
@@ -128,6 +129,7 @@ export default function App() {
               <Route path="discounts" element={<AdminDiscounts />} />
               <Route path="reviews" element={<AdminReviews />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="website-control" element={<AdminWebsiteControl />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
             <Route path="/" element={<Layout />}>

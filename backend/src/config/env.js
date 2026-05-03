@@ -22,6 +22,7 @@ const env = {
   jwtSecret: process.env.JWT_SECRET || 'dev_secret',
   databaseUrl: process.env.DATABASE_URL,
   frontendUrl: process.env.FRONTEND_URL,
+  ownerAdminEmail: String(process.env.OWNER_ADMIN_EMAIL || 'admin@local.test').trim().toLowerCase(),
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,

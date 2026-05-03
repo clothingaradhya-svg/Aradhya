@@ -12,12 +12,15 @@ import {
   Star,
   Users,
   LogOut,
-  Settings
+  Settings,
+  Globe2
 } from 'lucide-react';
+import { isOwnerAdmin } from '../../lib/adminOwner';
 
 const AdminLayout = () => {
   const { admin, isAuthenticated, loading, logout } = useAdminAuth();
   const location = useLocation();
+  const canManageWebsite = isOwnerAdmin(admin);
 
   if (loading) {
     return (
@@ -97,6 +100,12 @@ const AdminLayout = () => {
                 <Users className="w-5 h-5" />
                 <span>Users</span>
               </NavLink>
+              {canManageWebsite ? (
+                <NavLink to="/admin/website-control" className={navItemClass}>
+                  <Globe2 className="w-5 h-5" />
+                  <span>Website Control</span>
+                </NavLink>
+              ) : null}
               <NavLink to="/admin/settings" className={navItemClass}>
                 <Settings className="w-5 h-5" />
                 <span>Settings</span>

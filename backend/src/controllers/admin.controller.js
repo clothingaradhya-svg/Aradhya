@@ -3,6 +3,7 @@ const { z } = require('zod');
 const { OrderStatus } = require('@prisma/client');
 
 const { getPrisma } = require('../db/prismaClient');
+const { env } = require('../config/env');
 const { signToken } = require('../utils/jwt');
 const { sendSuccess, sendError } = require('../utils/response');
 
@@ -203,6 +204,11 @@ exports.getSiteSettings = async (_req, res, next) => {
 
 exports.updateSiteSettings = async (req, res, next) => {
   try {
+    const requesterEmail = String(req.user?.email || '').trim().toLowerCase();
+    if (requesterEmail !== env.ownerAdminEmail) {
+      return sendError(res, 403, 'Only the owner admin can manage website control.');
+    }
+
     const payload = siteSettingsSchema.parse(req.body);
     const prisma = await getPrisma();
     const value = normalizeSiteSettings(payload);
