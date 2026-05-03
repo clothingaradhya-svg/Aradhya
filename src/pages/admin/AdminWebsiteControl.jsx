@@ -8,6 +8,21 @@ import { isOwnerAdmin } from '../../lib/adminOwner';
 
 const DEFAULT_OFFLINE_MESSAGE = 'We are updating the store. Please check back soon.';
 
+const OwnerAccessDenied = () => (
+  <div className="flex min-h-[420px] items-center justify-center">
+    <section className="w-full max-w-lg rounded-2xl border border-rose-500/30 bg-[#0d1323] p-8 text-center shadow-xl">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-300">
+        <ShieldAlert className="h-7 w-7" />
+      </div>
+      <p className="mt-6 text-xs font-bold uppercase tracking-[0.3em] text-rose-300">Access Denied</p>
+      <h1 className="mt-3 text-2xl font-black tracking-tight text-white">Owner account required</h1>
+      <p className="mt-3 text-sm leading-6 text-slate-400">
+        This page is locked and cannot be managed from a normal admin account.
+      </p>
+    </section>
+  </div>
+);
+
 const AdminWebsiteControl = () => {
   const { admin, token, isAuthenticated, loading: authLoading } = useAdminAuth();
   const location = useLocation();
@@ -86,7 +101,7 @@ const AdminWebsiteControl = () => {
   }
 
   if (!isOwnerAdmin(admin)) {
-    return <Navigate to="/" replace />;
+    return <OwnerAccessDenied />;
   }
 
   if (loading) {

@@ -50,6 +50,7 @@ const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminWebsiteControl = lazy(() => import('./pages/admin/AdminWebsiteControl'));
 
 const RouteFallback = () => <div className="min-h-screen bg-white" />;
+const OWNER_CONTROL_PATH = '/as-owner-vault/status-console';
 
 const OwnerWebsiteControlRoute = () => (
   <AdminProvider>
@@ -79,7 +80,7 @@ const SiteStatusGate = ({ children }) => {
   const location = useLocation();
   const [settings, setSettings] = useState(null);
   const isAdminPath = location.pathname.startsWith('/admin');
-  const isOwnerPath = location.pathname.startsWith('/owner');
+  const isOwnerPath = location.pathname === OWNER_CONTROL_PATH;
 
   useEffect(() => {
     if (isAdminPath || isOwnerPath) return;
@@ -145,7 +146,7 @@ export default function App() {
               <Route path="users" element={<AdminUsers />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
-            <Route path="/owner/website-control" element={<OwnerWebsiteControlRoute />} />
+            <Route path={OWNER_CONTROL_PATH} element={<OwnerWebsiteControlRoute />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
               <Route path="search" element={<SearchPage />} />
